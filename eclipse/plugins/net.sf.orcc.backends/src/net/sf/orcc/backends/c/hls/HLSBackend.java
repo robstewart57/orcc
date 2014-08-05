@@ -38,6 +38,8 @@ import net.sf.orcc.backends.c.CBackend;
 import net.sf.orcc.backends.transform.CastArgFuncCall;
 import net.sf.orcc.backends.transform.DisconnectedOutputPortRemoval;
 import net.sf.orcc.backends.transform.Multi2MonoToken;
+import net.sf.orcc.backends.util.Alignable;
+import net.sf.orcc.backends.util.Validator;
 import net.sf.orcc.df.Actor;
 import net.sf.orcc.df.Instance;
 import net.sf.orcc.df.Network;
@@ -143,6 +145,16 @@ public class HLSBackend extends CBackend {
 
 	}
 
+	@Override
+	protected void doValidate(Network network) {
+		Validator.checkMinimalFifoSize(network, fifoSize);
+
+		network.computeTemplateMaps();
+
+		// update alignment information
+		Alignable.setAlignability(network);
+	}
+	
 	@Override
 	protected void doXdfCodeGeneration(Network network) {
 		doTransformNetwork(network);
