@@ -83,6 +83,7 @@ typedef enum reasons {
 struct schedinfo_s {
     int num_firings;
     reasons_t reason;
+    char *blocked;
     int ports; /** contains a mask that indicate the ports affected */
 };
 

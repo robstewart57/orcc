@@ -277,7 +277,7 @@ void *scheduler_routine(void *data) {
                 my_actor->misses++;
             }
             if(opt->print_firings) {
-                printf("%2i  %5i\t%s\t%s\n", sched->id, si.num_firings, si.reason == starved ? "starved" : "full", my_actor->name);
+              printf("%2i  %5i\t%s\t%s\t\t%s\n", sched->id, si.num_firings, si.reason == starved ? "starved" : "full", si.blocked, my_actor->name);
             }
         }
 

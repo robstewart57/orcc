@@ -541,6 +541,7 @@ class InstancePrinter extends CTemplate {
 					«trans.action.outputPattern.printOutputPattern»
 						_FSM_state = my_state_«state.name»;
 						si->num_firings = i;
+						si->blocked = "blocked action:«trans.action.getName»";
 						si->reason = full;
 						goto finished;
 					}
@@ -569,6 +570,7 @@ class InstancePrinter extends CTemplate {
 		«printStateTransition(state, trans)»
 		}«ENDFOR» else {
 			«transitionPattern.get(state).printTransitionPattern»
+			si->blocked = "blocked state:«state.name»";
 			_FSM_state = my_state_«state.name»;
 			goto finished;
 		}
@@ -655,6 +657,7 @@ class InstancePrinter extends CTemplate {
 				«IF !action.outputPattern.empty && !outputSchedulable»
 					«action.outputPattern.printOutputPattern»
 						si->num_firings = i;
+						si->blocked = "blocked action:«action.getName»";
 						si->reason = full;
 						goto finished;
 					}
