@@ -264,6 +264,7 @@ void *scheduler_routine(void *data) {
     while (1) {
         my_actor = sched_get_next_schedulable(sched);
         if(my_actor != NULL){
+          if (my_actor->delay == 0){
             tick_in = getticks();
             si.num_firings = 0;
 
@@ -274,11 +275,27 @@ void *scheduler_routine(void *data) {
             my_actor->ticks += diff_tick;
             my_actor->switches++;
             if (si.num_firings == 0) {
-                my_actor->misses++;
+              my_actor->misses++;
+              my_actor->cool_off++;
+              my_actor->delay = my_actor->cool_off;
+              if(opt->print_firings) {
+                printf("Switch delay %i for %s\n", my_actor->delay, my_actor->name);
+              }
+            }
+            else {
+              my_actor->delay = 0;
+              my_actor->cool_off = 0;
+              if(opt->print_firings) {
+                printf("Reset delay to 0 for %s\n", my_actor->name);
+              }
             }
             if(opt->print_firings) {
                 printf("%2i  %5i\t%s\t%s\n", sched->id, si.num_firings, si.reason == starved ? "starved" : "full", my_actor->name);
             }
+          }
+          else{
+            my_actor->delay--;
+          }
         }
 
 #ifdef THREADS_ENABLE

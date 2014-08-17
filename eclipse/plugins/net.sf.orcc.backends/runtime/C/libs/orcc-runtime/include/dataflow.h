@@ -72,6 +72,8 @@ struct actor_s {
     int firings; /** nb of firings for profiling */
     int switches; /** nb of switches for profiling */
     int misses; /** nb of misses for profiling */
+    int delay; /** nb of switches before calling sched_func */
+    int cool_off; /** nb increases delay for each subsequent miss */
 };
 
 /*
