@@ -4,6 +4,10 @@
    <extension-point id="backends" name="backends" schema="schema/backends.exsd"/>
    <extension
          point="net.sf.orcc.backends.backends">
+         <backend
+            class="net.sf.orcc.backends.cal.CALBackend"
+            name="CAL">
+      </backend>
       <backend
             class="net.sf.orcc.backends.c.CBackend"
             name="C">
