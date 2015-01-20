@@ -7,6 +7,9 @@
          <backend
             class="net.sf.orcc.backends.cal.CALBackend"
             name="CAL">
+            <option
+               id="net.sf.orcc.plugins.compileXDF">
+         </option>
       </backend>
       <backend
             class="net.sf.orcc.backends.c.CBackend"

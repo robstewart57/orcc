@@ -29,11 +29,17 @@
 package net.sf.orcc.backends.cal;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 
 import net.sf.orcc.backends.AbstractBackend;
+import net.sf.orcc.backends.util.Alignable;
 import net.sf.orcc.df.Actor;
+import net.sf.orcc.df.Instance;
 import net.sf.orcc.df.Network;
 import net.sf.orcc.df.util.XdfWriter;
+import net.sf.orcc.util.Result;
 
 /**
  * CAL back-end for CAL source to CAL source transformations
@@ -47,7 +53,6 @@ import net.sf.orcc.df.util.XdfWriter;
  */
 
 public class CALBackend extends AbstractBackend {
-
 	/**
 	 * Path to target "src" folder
 	 */
@@ -55,26 +60,59 @@ public class CALBackend extends AbstractBackend {
 
 	@Override
 	protected void doInitializeOptions() {
-		srcPath = path + File.separator + "src";
+		srcPath = outputPath + File.separator + "src";
+	
+	// -----------------------------------------------------
+	// Transformations that will be applied on the Network
+	// -----------------------------------------------------
+    //
+    // e.g. networkTransfos.add(new UnitImporter());
+	
+	// -------------------------------------------------------------------
+	// Transformations that will be applied on children (instances/actors)
+	// -------------------------------------------------------------------
+    //
+    // e.g. childrenTransfos.add(new DfVisitor<Void>(new LoopUnrolling()));
+	}
+	
+	@Override
+	protected void beforeGeneration(Network network) {
+		network.computeTemplateMaps(); // is this necessary?
+	}
+	
+	@Override
+	protected Result doGenerateNetwork(Network network) {
+		XdfWriter writer = new XdfWriter();
+		File file = new File( pkgNameToPath(network) );
+		OutputStream os = null;
+		try {
+			os = new FileOutputStream(file);
+		} catch (FileNotFoundException e) {e.printStackTrace();}
+		writer.write(network, os);
+		return Result.newInstance(); // what's actually appropriate here?
+	}
+
+	// what is this for? I.e. what's the difference between this and doGenerateInstance(..) ?
+	/* @Override
+    	protected Result doGenerateActor(Actor actor) {
+    		return Result.newInstance();
+    	}
+    */
+	
+	@Override
+	protected Result doGenerateInstance(Instance instance) {
+		Actor actor = instance.getActor();
+		String targetPath = srcPath + "/" + actor.getPackage().replace(".", "/");
+		new ActorPrinter(actor,actor.getPackage()).printActor( targetPath );
+		return Result.newInstance(); 
 	}
 
 	@Override
-	protected void doTransformActor(Actor actor) {
-		// apply actor transformations, e.g.
-		/*
-		List<DfSwitch<?>> transformations = new ArrayList<DfSwitch<?>>();
-		transformations.add(new TypeResizer(true, false, true, false));
-		// < .. more transformations .. >
-		for (DfSwitch<?> transformation : transformations) {
-			transformation.doSwitch(actor);
-			if (debug) {
-				OrccUtil.validateObject(transformation.toString() + " on "
-						+ actor.getName(), actor);
-			}
-		}
-      */
+	protected void beforeGeneration(Actor actor) {
+		// update "vectorizable" information
+		Alignable.setAlignability(actor);
 	}
-
+	
 	private String pkgNameToPath(Network network){
 		String pkgName = network.getPackage();
 		String fileName = new File(network.getFileName()).getName() ;
@@ -89,21 +127,8 @@ public class CALBackend extends AbstractBackend {
 	
 	private String pkgNameToPath(String pkgName, String fileName){
 		String path = srcPath + "/" + pkgName.replace(".", "/") ;
-		String srcFilePath = path + fileName ;
+		String srcFilePath = path + "/" + fileName ;
 		new File(path).mkdirs();
 		return srcFilePath ;
-	}
-	
-	@Override
-	protected void doXdfCodeGeneration(Network network) {
-		XdfWriter writer = new XdfWriter();
-		File file = new File( pkgNameToPath(network) );
-		writer.write(file, network);
-	}
-
-	@Override
-	protected boolean printActor(Actor actor) {
-		new ActorPrinter(actor,actor.getPackage()).printActor( pkgNameToPath(actor) );
-		return true;
 	}
 }
