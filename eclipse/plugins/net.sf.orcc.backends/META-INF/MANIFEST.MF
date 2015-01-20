@@ -21,4 +21,5 @@ Export-Package: net.sf.orcc.backends,
  net.sf.orcc.backends.transform,
  net.sf.orcc.backends.transform.ssa,
  net.sf.orcc.backends.util
+Import-Package: javanet.staxutils
 

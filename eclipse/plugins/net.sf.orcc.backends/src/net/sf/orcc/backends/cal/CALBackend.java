@@ -28,11 +28,13 @@
  */
 package net.sf.orcc.backends.cal;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 
+import javanet.staxutils.IndentingXMLStreamWriter;
 import net.sf.orcc.backends.AbstractBackend;
 import net.sf.orcc.backends.util.Alignable;
 import net.sf.orcc.df.Actor;
@@ -41,6 +43,9 @@ import net.sf.orcc.df.Network;
 import net.sf.orcc.df.util.XdfWriter;
 import net.sf.orcc.util.Result;
 
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamWriter;
+
 /**
  * CAL back-end for CAL source to CAL source transformations
  * 
@@ -48,8 +53,7 @@ import net.sf.orcc.util.Result;
  * @author Endri Bezati
  * 
  * TODO:
- * 1. create .project file and write to project root i.e. srcPath
- * 2. complete CAL language coverage, see TODO in ActorPrinter.xtend .
+ * - complete CAL language coverage, see TODOs in ActorPrinter.xtend
  */
 
 public class CALBackend extends AbstractBackend {
@@ -61,50 +65,55 @@ public class CALBackend extends AbstractBackend {
 	@Override
 	protected void doInitializeOptions() {
 		srcPath = outputPath + File.separator + "src";
-	
-	// -----------------------------------------------------
-	// Transformations that will be applied on the Network
-	// -----------------------------------------------------
-    //
-    // e.g. networkTransfos.add(new UnitImporter());
-	
-	// -------------------------------------------------------------------
-	// Transformations that will be applied on children (instances/actors)
-	// -------------------------------------------------------------------
-    //
-    // e.g. childrenTransfos.add(new DfVisitor<Void>(new LoopUnrolling()));
+
+		// -----------------------------------------------------
+		// Transformations that will be applied on the Network
+		// -----------------------------------------------------
+		//
+		// e.g. networkTransfos.add(new UnitImporter());
+
+		// -------------------------------------------------------------------
+		// Transformations that will be applied on children (instances/actors)
+		// -------------------------------------------------------------------
+		//
+		// e.g. childrenTransfos.add(new DfVisitor<Void>(new LoopUnrolling()));
 	}
-	
+
 	@Override
 	protected void beforeGeneration(Network network) {
-		network.computeTemplateMaps(); // is this necessary?
+		// network.computeTemplateMaps(); // is this necessary?
+		new File(outputPath + File.separator + "src").mkdirs();
+		writeDotProjectFile();
 	}
-	
+
 	@Override
 	protected Result doGenerateNetwork(Network network) {
 		XdfWriter writer = new XdfWriter();
-		File file = new File( pkgNameToPath(network) );
+		File file = new File(pkgNameToPath(network));
 		OutputStream os = null;
 		try {
 			os = new FileOutputStream(file);
-		} catch (FileNotFoundException e) {e.printStackTrace();}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
 		writer.write(network, os);
 		return Result.newInstance(); // what's actually appropriate here?
 	}
 
-	// what is this for? I.e. what's the difference between this and doGenerateInstance(..) ?
-	/* @Override
-    	protected Result doGenerateActor(Actor actor) {
-    		return Result.newInstance();
-    	}
-    */
-	
+	// what is this for? I.e. what's the difference between this and
+	// doGenerateInstance(..) ?
+	/*
+	 * @Override protected Result doGenerateActor(Actor actor) { return
+	 * Result.newInstance(); }
+	 */
+
 	@Override
 	protected Result doGenerateInstance(Instance instance) {
 		Actor actor = instance.getActor();
-		String targetPath = srcPath + "/" + actor.getPackage().replace(".", "/");
-		new ActorPrinter(actor,actor.getPackage()).printActor( targetPath );
-		return Result.newInstance(); 
+		String targetPath = srcPath + File.separator
+				+ actor.getPackage().replace(".", File.separator);
+		new ActorPrinter(actor, actor.getPackage()).printActor(targetPath);
+		return Result.newInstance();
 	}
 
 	@Override
@@ -112,23 +121,79 @@ public class CALBackend extends AbstractBackend {
 		// update "vectorizable" information
 		Alignable.setAlignability(actor);
 	}
-	
-	private String pkgNameToPath(Network network){
+
+	private String pkgNameToPath(Network network) {
 		String pkgName = network.getPackage();
-		String fileName = new File(network.getFileName()).getName() ;
-		return pkgNameToPath(pkgName,fileName);
+		String fileName = new File(network.getFileName()).getName();
+		return pkgNameToPath(pkgName, fileName);
 	}
-	
-	private String pkgNameToPath(Actor actor){
-		String pkgName = actor.getPackage();
-		String fileName = new File(actor.getFileName()).getName() ;
-		return pkgNameToPath(pkgName,fileName);
-	}
-	
-	private String pkgNameToPath(String pkgName, String fileName){
-		String path = srcPath + "/" + pkgName.replace(".", "/") ;
-		String srcFilePath = path + "/" + fileName ;
+
+	private String pkgNameToPath(String pkgName, String fileName) {
+		String path = srcPath + File.separator + pkgName.replace(".", File.separator);
+		String srcFilePath = path + File.separator + fileName;
 		new File(path).mkdirs();
-		return srcFilePath ;
+		return srcFilePath;
+	}
+
+	private void writeDotProjectFile() {
+		File file = new File(srcPath + File.separator, ".project");
+		OutputStream os;
+		try {
+			os = new FileOutputStream(file);
+			os = new BufferedOutputStream(os);
+			XMLOutputFactory factory = XMLOutputFactory.newInstance();
+			XMLStreamWriter writer = new IndentingXMLStreamWriter(
+					factory.createXMLStreamWriter(os));
+			writer.writeStartDocument();
+			writer.writeComment("Orcc generated CAL project");
+			writer.writeStartElement("projectDescription");
+			
+			writer.writeStartElement("name");
+			writer.writeCharacters(project.getName());
+			writer.writeEndElement();
+			
+			writer.writeStartElement("comment");
+			writer.writeEndElement();
+
+			writer.writeStartElement("projects");
+			writer.writeEndElement();
+			
+			writer.writeStartElement("buildSpec");
+			
+			writer.writeStartElement("buildCommand");
+			
+			writer.writeStartElement("name");
+			writer.writeCharacters("org.eclipse.xtext.ui.shared.xtextBuilder");
+			writer.writeEndElement();
+			
+			writer.writeStartElement("arguments");
+			writer.writeEndElement();
+			
+			writer.writeEndElement(); // buildCommand
+			writer.writeEndElement(); // buildSpec
+			
+			writer.writeStartElement("natures");
+			
+			writer.writeStartElement("nature");
+			writer.writeCharacters("net.sf.orcc.core.nature");
+			writer.writeEndElement();
+			
+			writer.writeStartElement("nature");
+			writer.writeCharacters("org.eclipse.xtext.ui.shared.xtextNature");
+			writer.writeEndElement();
+			
+			writer.writeStartElement("nature");
+			writer.writeCharacters("org.eclipse.jdt.core.javanature");
+			writer.writeEndElement();
+			
+			writer.writeEndElement(); // natures
+			
+			writer.writeEndElement(); // projectDescription
+			
+			writer.writeEndDocument();
+			writer.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
