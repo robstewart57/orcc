@@ -149,7 +149,7 @@ public class CALBackend extends AbstractBackend {
 			writer.writeStartElement("projectDescription");
 			
 			writer.writeStartElement("name");
-			writer.writeCharacters(project.getName());
+			writer.writeCharacters(project.getName() + "-tmp"); // TODO remove "-tmp"
 			writer.writeEndElement();
 			
 			writer.writeStartElement("comment");

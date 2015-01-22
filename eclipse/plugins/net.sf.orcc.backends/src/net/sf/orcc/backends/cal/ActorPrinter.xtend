@@ -58,7 +58,7 @@ class ActorPrinter extends CommonPrinter {
 	protected Actor actor
 
 	private EMap<Var, Port> inVarToPort;
-
+	// private EMap<Port, Var> inPortToVarMap;
 	private EMap<Var, Port> outVarToPort;
 
 	private String actorPackage
@@ -130,6 +130,9 @@ class ActorPrinter extends CommonPrinter {
 		'''
 	}
 
+    // Actually it is not difficult to modify the name variables. You need to visit the input patterns with the DfVisitor for each actor
+	//
+	// have a look on how to visit patterns on file XronosScheduler line 144
 	def actionPorts(Pattern pattern) '''
 		«FOR port : pattern.ports SEPARATOR ", "»
 			«actionPort(port, pattern.portToVarMap.get(port))»

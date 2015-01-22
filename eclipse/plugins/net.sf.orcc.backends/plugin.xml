@@ -10,6 +10,15 @@
             <option
                id="net.sf.orcc.plugins.compileXDF">
          </option>
+         <option
+               id="net.sf.orcc.core.classify">
+         </option>
+         <option
+               id="net.sf.orcc.backends.checkArrayInbounds">
+         </option>
+         <option
+               id="net.sf.orcc.backends.inline">
+         </option>
       </backend>
       <backend
             class="net.sf.orcc.backends.c.CBackend"
