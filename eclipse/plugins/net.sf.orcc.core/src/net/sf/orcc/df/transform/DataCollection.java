@@ -101,105 +101,130 @@ public class DataCollection extends DfVisitor<Void> {
 	// IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
 	// project = root.getProject(getOption(PROJECT, ""));
 	// currentResourceSet = new ResourceSetImpl();
-	
+
 	/*
-	final IFile xdfFile = getFile(project, networkQName, OrccUtil.NETWORK_SUFFIX);
-	if (xdfFile == null) {
-		throw new OrccRuntimeException(
-				"Unable to find the XDF file " + "corresponding to the network " + networkQName + ".");
-	} else {
-		network = EcoreHelper.getEObject(currentResourceSet, xdfFile);
-	}
-	*/
-	
-	public DataCollection()
-	{
+	 * final IFile xdfFile = getFile(project, networkQName,
+	 * OrccUtil.NETWORK_SUFFIX); if (xdfFile == null) { throw new
+	 * OrccRuntimeException( "Unable to find the XDF file " +
+	 * "corresponding to the network " + networkQName + "."); } else { network =
+	 * EcoreHelper.getEObject(currentResourceSet, xdfFile); }
+	 */
+
+	public DataCollection() {
 	}
 
 	@Override
 	public Void caseNetwork(Network ignoreNetwork) {
-		
+
+		String fileName = "/home/rob/Documents/rathlin/cal-stats/actor-wires.txt";
+		try {
+			String line = "name actors wires";
+			java.io.File f = new java.io.File(fileName);
+			f.delete();
+			Files.write(Paths.get(fileName), (line + "\n").getBytes(), StandardOpenOption.CREATE_NEW);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 		IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
 		for (IProject project : root.getProjects()) {
 			System.out.println("project: " + project.getName());
-			
+
 			try {
-				
-			for (IResource res : project.members()) {
-				List<IFile> xdfFilesInProject = processResource(project,res);
-				for (IFile xdfFile : xdfFilesInProject) {
-					ResourceSet currentResourceSet = new ResourceSetImpl();
-					Network network = EcoreHelper.getEObject(currentResourceSet, xdfFile);
-					System.out.println("Actors in XDF file: " + network.getAllActors().size());
+
+				for (IResource res : project.members()) {
+					List<IFile> xdfFilesInProject = processResource(project, res);
+					for (IFile xdfFile : xdfFilesInProject) {
+						ResourceSet currentResourceSet = new ResourceSetImpl();
+						Network network = EcoreHelper.getEObject(currentResourceSet, xdfFile);
+
+						if (network != null) {
+
+							boolean bottomLevelNetwork = true;
+							for (Vertex v : network.getChildren()) {
+								Instance inst = (Instance) v;
+								if (inst.isNetwork()) {
+									bottomLevelNetwork = false;
+								}
+							}
+
+							if (!bottomLevelNetwork) {
+							//	NetworkFlattener flattener = new NetworkFlattener();
+							//	flattener.doSwitch(network);
+								// System.out.println("Actors in XDF file: " +
+								// network.getAllActors().size());
+
+								// java.io.File dataFile = new
+								// java.io.File(fileName);
+								try {
+									String line = project.getName() + "-" + network.getName() + " "
+											+ network.getAllActors().size() + " " + countAllNestedConnections(network);
+									Files.write(Paths.get(fileName), (line + "\n").getBytes(),
+											StandardOpenOption.APPEND);
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+							}
+						}
+					}
 				}
-			}
-				
 			} catch (CoreException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			
 		}
-		
-		
-		
-		// this.network = network;
-		/*
-		String fileName = "/home/rob/Documents/rathlin/cal-stats/actor-wires.txt";
-		File dataFile = new File(fileName);
-		try {
-			String line = "name actors wires";
-			Files.write(Paths.get(fileName), (line+"\n").getBytes(), StandardOpenOption.CREATE);
-			line = network.getName() + " "  + network.getAllActors().size() + " " + network.getConnections().size();
-			Files.write(Paths.get(fileName), (line+"\n").getBytes(), StandardOpenOption.APPEND);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		*/
-		
 		return null;
 	}
 
+	/* maybe this could be an Orcc API method? */
+	int countAllNestedConnections(Network network) {
+		int i = network.getConnections().size();
+		for (Vertex v : network.getChildren()) {
+			Instance inst = (Instance) v;
+			if (inst.isNetwork()) {
+				Network subNetwork = inst.getNetwork();
+				i += countAllNestedConnections(subNetwork);
+			}
+		}
+		return i;
+	}
+	
 	/*
-	 * IFolder folder = project.getFolder("Folder1");
-       IFile file = folder.getFile("hello.txt");
+	 * IFolder folder = project.getFolder("Folder1"); IFile file =
+	 * folder.getFile("hello.txt");
 	 */
-	
-	
-	List<IFile> processResource(IProject project, IResource resource)
-	{
-	List xdfFiles = new ArrayList<IFile>();
-	   IResource[] members;
-	   IFolder folder;
-	   IFile file;
-	 try {
-		
-	      if (resource instanceof Folder) 
-	       {
-	         Folder fol = (Folder) resource;
-	         for (IResource res : fol.members()) {
-	        	 xdfFiles.addAll(processResource(project,res));
-	         }
-	       }
-	      else if (resource instanceof File)
-	       {
-	    	  File f = (File) resource;
-	    	  if (f.getFileExtension().equals("xdf")) {
-	    	  // System.out.println("FILE: " + f.getFullPath().toString());
 
-	    	  IFile ifile;
-	    	  ifile = ResourcesPlugin.getWorkspace().getRoot().getFile(f.getFullPath());
-	    	  if (ifile != null) {
-	    	  xdfFiles.add(ifile);
-	    	  }
-	       }
-	       }
-	    
-	} catch (CoreException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
+	List<IFile> processResource(IProject project, IResource resource) {
+		List xdfFiles = new ArrayList<IFile>();
+		IResource[] members;
+		IFolder folder;
+		IFile file;
+		try {
+
+			if (resource instanceof Folder) {
+				Folder fol = (Folder) resource;
+				for (IResource res : fol.members()) {
+					xdfFiles.addAll(processResource(project, res));
+				}
+			} else if (resource instanceof File) {
+				File f = (File) resource;
+				if (f != null && f.getFileExtension() != null && f.getFileExtension().equals("xdf")) {
+					// System.out.println("FILE: " +
+					// f.getFullPath().toString());
+
+					IFile ifile;
+					ifile = ResourcesPlugin.getWorkspace().getRoot().getFile(f.getFullPath());
+					if (ifile != null) {
+						xdfFiles.add(ifile);
+					}
+				}
+			}
+
+		} catch (CoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return xdfFiles;
 	}
-	return xdfFiles;
-	}
-	
+
 }
