@@ -31,6 +31,7 @@ package net.sf.orcc.xdf.ui.diagram;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.sf.orcc.xdf.ui.features.DataCollectionFeature;
 import net.sf.orcc.xdf.ui.features.GroupInstancesFeature;
 import net.sf.orcc.xdf.ui.features.InstanceDblClickFeature;
 import net.sf.orcc.xdf.ui.features.OpenPropertiesFeature;
@@ -165,6 +166,8 @@ public class XdfDiagramToolBehaviorProvider extends DefaultToolBehaviorProvider 
 		entry.add(new ContextMenuEntry(new GroupInstancesFeature(getFeatureProvider()), context));
 		entry.add(new ContextMenuEntry(new UngroupNetworkFeature(getFeatureProvider()), context));
 		contextMenuEntries.add(entry);
+		
+		entry.add(new ContextMenuEntry(new DataCollectionFeature(getFeatureProvider()), context));
 
 		// 'Highlight costs' menu entry
 		entry = new ContextMenuEntry(null, context);
