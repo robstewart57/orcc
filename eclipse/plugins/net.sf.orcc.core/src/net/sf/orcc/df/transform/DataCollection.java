@@ -140,18 +140,31 @@ public class DataCollection extends DfVisitor<Void> {
 		// System.out.println("independant input ports");
 		// independantInputPorts(dir + "independant-input-ports.txt",
 		// workspaceXdfNetworks);
+
+		// System.out.println("independant output ports");
+		// independantOutputPorts(dir + "independant-output-ports.txt",
+		// workspaceXdfNetworks);
+
 		// System.out.println("number of global variables");
 		// multipleActionsNoGlobalVars(dir + "global-vars.txt",
 		// workspaceXdfNetworks);
 		//
 		// System.out.println("FSM analysis");
 		// fsmAnalysis(dir + "fsm-types.txt", workspaceXdfNetworks);
-
+		//
 		// System.out.println("Purity analysis");
 		// isPure(dir + "purity.txt", workspaceXdfNetworks);
+		//
+		// System.out.println("Repeat pattern refactor potential");
+		// hasRepeatPatternPotential(dir + "repeat-potential.txt",
+		// workspaceXdfNetworks);
 
-		System.out.println("Repeat pattern refactor potential");
-		hasRepeatPatternPotential(dir + "repeat-potential.txt", workspaceXdfNetworks);
+		// System.out.println("Determinate action");
+		// nonDeterminateAction(dir + "determinate-action.txt",
+		// workspaceXdfNetworks);
+
+		System.out.println("Guard analysis");
+		guards(dir + "guards.txt", workspaceXdfNetworks);
 
 		return null;
 	}
@@ -164,6 +177,136 @@ public class DataCollection extends DfVisitor<Void> {
 			this.project = project;
 			this.network = network;
 		}
+	}
+
+	public void guards(String guardCounts, List<NetworkTuple> networkTuples) {
+		try {
+
+			// IProject project;
+			Network thisNetwork;
+			// Actor act = null;
+			String dataLine;
+			List<Actor> actors;
+			String titleLine = "actor actions tokenGuards sharedVarGuards";
+			java.io.File f = new java.io.File(guardCounts);
+			// List<String> actorsRecorded = new ArrayList<String>();
+			f.delete();
+			Files.write(Paths.get(guardCounts), (titleLine + "\n").getBytes(), StandardOpenOption.CREATE_NEW);
+
+			for (NetworkTuple<IProject, Network> networkTuple : networkTuples) {
+				thisNetwork = networkTuple.network;
+				actors = thisNetwork.getAllActors();
+
+				for (Actor act : actors) {
+
+					for (Action action : act.getActions()) {
+						int tokenGuards = 0;
+						int sharedVarGuards = 0;
+						BlockBasic guardBlock = (BlockBasic) action.getScheduler().getBlocks().get(0);
+						for (Instruction inst : guardBlock.getInstructions()) {
+							// System.out.println(inst);
+							List<String> loadedVars = new ArrayList<String>();
+							if (inst instanceof InstLoad) {
+								InstLoad instLoad = (InstLoad) inst;
+								Var loadedVar = instLoad.getSource().getVariable();
+
+								if (!loadedVars.contains(loadedVar.getName())) {
+									// if
+									// (act.getName().equals("avs.decode.intra.Algo_IntraPred_CHROMA_8x8_AVSJZ"))
+									// {
+									// System.out.println(action.getName() + " :
+									// " + loadedVar.getName());
+									// }
+
+									boolean isGlobal = false;
+									boolean isTokenVal = false;
+									for (Var stateVar : act.getStateVars()) {
+										if (stateVar.getName().equals(loadedVar.getName())) {
+											isGlobal |= true;
+										}
+									}
+									if (isGlobal) {
+										sharedVarGuards++;
+									} else {
+										for (Var tokenVar : action.getInputPattern().getVariables()) {
+											if (tokenVar.getName().equals(loadedVar.getName())) {
+												isTokenVal |= true;
+											}
+										}
+										if (isTokenVal) {
+											tokenGuards++;
+										}
+									}
+									loadedVars.add(loadedVar.getName());
+								}
+							}
+						}
+
+						dataLine = act.getName() + " " + action.getName() + " " + tokenGuards + " " + sharedVarGuards;
+						Files.write(Paths.get(guardCounts), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
+
+					}
+
+				}
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void nonDeterminateAction(String nonDeterminateAction, List<NetworkTuple> networkTuples) {
+		try {
+
+			// IProject project;
+			Network thisNetwork;
+			// Actor act = null;
+			String dataLine;
+			List<Actor> actors;
+			String titleLine = "actor actions isDeterminate";
+			java.io.File f = new java.io.File(nonDeterminateAction);
+			// List<String> actorsRecorded = new ArrayList<String>();
+			f.delete();
+			Files.write(Paths.get(nonDeterminateAction), (titleLine + "\n").getBytes(), StandardOpenOption.CREATE_NEW);
+
+			for (NetworkTuple<IProject, Network> networkTuple : networkTuples) {
+				thisNetwork = networkTuple.network;
+				actors = thisNetwork.getAllActors();
+
+				for (Actor act : actors) {
+
+					for (Action action : act.getActions()) {
+						String s = isDeterminate(action.getBody()) ? "yes" : "no";
+						dataLine = act.getName() + " " + action.getName() + " " + s;
+						Files.write(Paths.get(nonDeterminateAction), (dataLine + "\n").getBytes(),
+								StandardOpenOption.APPEND);
+
+					}
+
+				}
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private boolean isDeterminate(Procedure proc) {
+		boolean b = true;
+		for (Block block : proc.getBlocks()) {
+			b &= isDeterminate(block);
+		}
+		return b;
+	}
+
+	private boolean isDeterminate(Block block) {
+		boolean b = true;
+		if (block instanceof BlockWhile) {
+			b = false;
+		} else if (block instanceof BlockIf) {
+			b = false;
+		}
+		return b;
 	}
 
 	public void hasRepeatPatternPotential(String repeatFilename, List<NetworkTuple> networkTuples) {
@@ -193,123 +336,128 @@ public class DataCollection extends DfVisitor<Void> {
 							basicBlock = (BlockBasic) action.getScheduler().getBlocks().get(0);
 							// LOAD, ASSIGN (==), or RETURN
 							List<Instruction> insts = basicBlock.getInstructions();
-							
-							
+
 							for (Instruction inst : insts) {
 								if (inst instanceof InstAssign) {
 									InstAssign ass = (InstAssign) inst;
-									
+
 									if (ass.getValue() instanceof ExprBinary) {
 										ExprBinary exprBin = (ExprBinary) ass.getValue();
-										if ((exprBin.getOp() == OpBinary.LT && action.getPeekPattern().getVariables().size() == 1)
-												|| (exprBin.getOp() == OpBinary.EQ && action.getPeekPattern().getVariables().isEmpty())) {
+										if ((exprBin.getOp() == OpBinary.LT
+												&& action.getPeekPattern().getVariables().size() == 1)
+												|| (exprBin.getOp() == OpBinary.EQ
+														&& action.getPeekPattern().getVariables().isEmpty())) {
 											if (exprBin.getE1().isExprVar() && exprBin.getE1().getType().isInt()) {
 												countVar = ((ExprVar) exprBin.getE1()).getUse().getVariable();
-												if (isAssignedTo(countVar,action.getBody())) {
-													// System.out.println("FOUND " + act.getName() + " " + action.getName() + " " + countVar.getName());
+												if (isAssignedTo(countVar, action.getBody())) {
+													// System.out.println("FOUND
+													// " + act.getName() + " " +
+													// action.getName() + " " +
+													// countVar.getName());
 													isRepeatCandidate = "yes";
 												}
-											}
-											else if (exprBin.getE2().isExprVar() && exprBin.getE2().getType().isInt()) {
+											} else if (exprBin.getE2().isExprVar()
+													&& exprBin.getE2().getType().isInt()) {
 												countVar = ((ExprVar) exprBin.getE2()).getUse().getVariable();
-												if (isAssignedTo(countVar,action.getBody())) {
+												if (isAssignedTo(countVar, action.getBody())) {
 													isRepeatCandidate = "yes";
-													//System.out.println("FOUND " + act.getName() + " " + action.getName() + " " + countVar.getName());
+													// System.out.println("FOUND
+													// " + act.getName() + " " +
+													// action.getName() + " " +
+													// countVar.getName());
 												}
 											}
 										}
 									}
+								}
 							}
-							}
-							
+
 							dataLine = act.getName() + " " + action.getName() + " " + isRepeatCandidate;
-							Files.write(Paths.get(repeatFilename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
-							
-							
+							Files.write(Paths.get(repeatFilename), (dataLine + "\n").getBytes(),
+									StandardOpenOption.APPEND);
+
 						}
 
 						actorsRecorded.add(act.getName());
 					}
 				}
-					}
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
+
 	private boolean isGlobalConst(Actor actor, String localVarName) {
 		boolean isConst = false;
-		
-		String varName = localVarName.substring(6,localVarName.length());
+
+		String varName = localVarName.substring(6, localVarName.length());
 		for (Var globalVar : actor.getStateVars()) {
-			
+
 			System.out.println("GLOBAL: " + globalVar.getInitialValue());
 			if (globalVar.getName().equals(varName) && globalVar.isAssignable()) {
-				
+
 			}
 		}
-		
+
 		return isConst;
 	}
-	
+
 	private boolean isAssignedTo(Var countVar, Procedure proc) {
 		boolean isAssignedByBody = false;
-		
+
 		List<Block> blocks = proc.getBlocks();
 		blocks.add(proc.getFirst());
 		blocks.add(proc.getLast());
-		
+
 		Iterator<Block> iter = blocks.iterator();
 		Block block;
 		while (!isAssignedByBody && iter.hasNext()) {
 			block = iter.next();
 			isAssignedByBody |= isAssignedTo(countVar, block);
 			// ignore BlockIf and BlockWhile
-//			if (block instanceof BlockBasic) {
-//				isAssignedByBody |= isAssignedTo(countVar,(BlockBasic) block);
-//			}
-//			else {
-//				System.out.println(block.getClass().toString());
-//			}
+			// if (block instanceof BlockBasic) {
+			// isAssignedByBody |= isAssignedTo(countVar,(BlockBasic) block);
+			// }
+			// else {
+			// System.out.println(block.getClass().toString());
+			// }
 		}
-		
+
 		return isAssignedByBody;
 	}
-	
+
 	private boolean isAssignedTo(Var countVar, Block block) {
 		boolean isAssignedByBody = false;
 		if (block instanceof BlockIf) {
-		//	isAssignedByBody = isAssignedTo(countVar, (BlockIf) block);
-		}
-		else if (block instanceof BlockWhile) {
-		//	isAssignedByBody = isAssignedTo(countVar, (BlockWhile) block);
-		}
-		else {
+			// isAssignedByBody = isAssignedTo(countVar, (BlockIf) block);
+		} else if (block instanceof BlockWhile) {
+			// isAssignedByBody = isAssignedTo(countVar, (BlockWhile) block);
+		} else {
 			isAssignedByBody = isAssignedTo(countVar, (BlockBasic) block);
 		}
-		
+
 		return isAssignedByBody;
 	}
-	
+
 	private boolean isAssignedTo(Var countVar, BlockIf block) {
 		boolean isAssignedByBody = false;
-		for(Block b : block.getThenBlocks()) {
-			isAssignedByBody |= isAssignedTo(countVar,b);
+		for (Block b : block.getThenBlocks()) {
+			isAssignedByBody |= isAssignedTo(countVar, b);
 		}
-		for(Block b : block.getElseBlocks()) {
-			isAssignedByBody |= isAssignedTo(countVar,b);
+		for (Block b : block.getElseBlocks()) {
+			isAssignedByBody |= isAssignedTo(countVar, b);
 		}
 		return isAssignedByBody;
 	}
-	
+
 	private boolean isAssignedTo(Var countVar, BlockWhile block) {
 		boolean isAssignedByBody = false;
 		for (Block b : block.getBlocks()) {
-			isAssignedByBody |= isAssignedTo(countVar,b);
+			isAssignedByBody |= isAssignedTo(countVar, b);
 		}
 		return isAssignedByBody;
 	}
-	
+
 	private boolean isAssignedTo(Var countVar, BlockBasic block) {
 		boolean isAssignedByBody = false;
 		for (Instruction inst : block.getInstructions()) {
@@ -321,14 +469,14 @@ public class DataCollection extends DfVisitor<Void> {
 				}
 				// System.out.println(s + " , " + ass);
 				isAssignedByBody |= (ass.getTarget().getVariable().getName().equals(s));
-			}
-			else if (inst.isInstStore()) {
+			} else if (inst.isInstStore()) {
 				InstStore store = (InstStore) inst;
 				String s = countVar.getName();
 				if (s.startsWith("local_")) {
 					s = s.substring(6, s.length());
 				}
-				//System.out.println(s + " , " + store.getTarget().getVariable().getName());
+				// System.out.println(s + " , " +
+				// store.getTarget().getVariable().getName());
 				isAssignedByBody |= (store.getTarget().getVariable().getName().equals(s));
 			}
 		}
@@ -530,22 +678,6 @@ public class DataCollection extends DfVisitor<Void> {
 					Files.write(Paths.get(noGlobalVarsFilenam), (dataLine + "\n").getBytes(),
 							StandardOpenOption.APPEND);
 
-					// for (Port p : act.getInputs()) {
-					// int consumersOfP = 0;
-					// for (Action action : act.getActions()) {
-					// Pattern patt = action.getInputPattern();
-					// for (Var var : patt.getVariables()) {
-					// if (var.getName().equals(p.getName())) {
-					// consumersOfP++;
-					// }
-					// }
-					// }
-					// dataLine = act.getName() + " " + p.getName() + " " +
-					// consumersOfP;
-					// Files.write(Paths.get(pipelinableFilename), (dataLine +
-					// "\n").getBytes(),
-					// StandardOpenOption.APPEND);
-					// }
 				}
 			}
 
@@ -584,6 +716,47 @@ public class DataCollection extends DfVisitor<Void> {
 							}
 						}
 						dataLine = act.getName() + " " + p.getName() + " " + consumersOfP;
+						Files.write(Paths.get(pipelinableFilename), (dataLine + "\n").getBytes(),
+								StandardOpenOption.APPEND);
+					}
+				}
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void independantOutputPorts(String pipelinableFilename, List<NetworkTuple> networkTuples) {
+		try {
+
+			// IProject project;
+			Network thisNetwork;
+			// Actor act = null;
+			String dataLine;
+			List<Actor> actors;
+			String titleLine = "actor inputPort consumers";
+			java.io.File f = new java.io.File(pipelinableFilename);
+			// List<String> actorsRecorded = new ArrayList<String>();
+			f.delete();
+			Files.write(Paths.get(pipelinableFilename), (titleLine + "\n").getBytes(), StandardOpenOption.CREATE_NEW);
+
+			for (NetworkTuple<IProject, Network> networkTuple : networkTuples) {
+				thisNetwork = networkTuple.network;
+				actors = thisNetwork.getAllActors();
+
+				for (Actor act : actors) {
+					for (Port p : act.getOutputs()) {
+						int producersToP = 0;
+						for (Action action : act.getActions()) {
+							Pattern patt = action.getOutputPattern();
+							for (Var var : patt.getVariables()) {
+								if (var.getName().equals(p.getName())) {
+									producersToP++;
+								}
+							}
+						}
+						dataLine = act.getName() + " " + p.getName() + " " + producersToP;
 						Files.write(Paths.get(pipelinableFilename), (dataLine + "\n").getBytes(),
 								StandardOpenOption.APPEND);
 					}
@@ -758,8 +931,7 @@ public class DataCollection extends DfVisitor<Void> {
 
 				for (Actor act : actors) {
 					if (!actorsRecorded.contains(act.getName())) {
-						if (act != null && act.getName() != null && act.getInputs() != null
-								&& act.getOutputs() != null) {
+						if (act != null && act.getName() != null) {
 							dataLine = act.getName() + " " + act.getActions().size();
 							Files.write(Paths.get(filename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
 						}
@@ -796,10 +968,16 @@ public class DataCollection extends DfVisitor<Void> {
 					act = actors.next();
 				// for (Actor act : thisNetwork.getAllActors()) {
 				if (!actorsRecorded.contains(act.getName())) {
-					if (act != null && act.getName() != null && act.getInputs() != null && act.getOutputs() != null) {
-						dataLine = act.getName() + " " + act.getInputs().size() + " " + act.getOutputs().size();
-						Files.write(Paths.get(filename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
+					int inputs = 0;
+					int outputs = 0;
+					if (act != null && act.getName() != null && act.getInputs() != null) {
+						inputs = act.getInputs().size();
 					}
+					if (act != null && act.getName() != null && act.getOutputs() != null) {
+						outputs = act.getOutputs().size();
+					}
+					dataLine = act.getName() + " " + inputs + " " + outputs;
+					Files.write(Paths.get(filename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
 					actorsRecorded.add(act.getName());
 				}
 				// }
