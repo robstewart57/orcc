@@ -163,8 +163,11 @@ public class DataCollection extends DfVisitor<Void> {
 		// nonDeterminateAction(dir + "determinate-action.txt",
 		// workspaceXdfNetworks);
 
-		System.out.println("Guard analysis");
-		guards(dir + "guards.txt", workspaceXdfNetworks);
+//		System.out.println("Guard analysis");
+//		guards(dir + "guards.txt", workspaceXdfNetworks);
+		
+		System.out.println("Acyclic non-branching consumption");
+		consumptionAcyclicNoBranching(dir + "acyclic-non-branching.txt", workspaceXdfNetworks);
 
 		return null;
 	}
@@ -177,6 +180,75 @@ public class DataCollection extends DfVisitor<Void> {
 			this.project = project;
 			this.network = network;
 		}
+	}
+	
+	private int consumptionAcyclicNoBranching(String acyclicNoBranching, List<NetworkTuple> networkTuples) {
+		int consumption = 0;
+		try {
+
+			// IProject project;
+			Network thisNetwork;
+			// Actor act = null;
+			String dataLine;
+			List<Actor> actors;
+			String titleLine = "actor consumption";
+			java.io.File f = new java.io.File(acyclicNoBranching);
+			// List<String> actorsRecorded = new ArrayList<String>();
+			f.delete();
+			Files.write(Paths.get(acyclicNoBranching), (titleLine + "\n").getBytes(), StandardOpenOption.CREATE_NEW);
+
+			for (NetworkTuple<IProject, Network> networkTuple : networkTuples) {
+				thisNetwork = networkTuple.network;
+				System.out.println("network: " + thisNetwork.getName() + " " + thisNetwork.getAllActors().size());
+				actors = thisNetwork.getAllActors();
+				FSM fsm;
+				for (Actor act : actors) {
+					fsm = act.getFsm();
+					System.out.println("analysing " + act.getName());
+					if (fsm != null) {
+					System.out.println(isAcyclic(fsm) + " " + !hasBranching(fsm));
+					}
+					if (fsm != null && isAcyclic(fsm) && !hasBranching(fsm)) {
+						
+						List<State> visited = new ArrayList<State>();
+						State thisState = fsm.getInitialState();
+						// State nextState;
+						Transition tran;
+						int consumed = 0;
+						while (!visited.contains(thisState)) {
+							tran = getTargetTransitions(fsm,thisState).get(0);
+							consumed += actionConsumption(tran.getAction());
+							visited.add(thisState);
+							thisState = tran.getTarget();
+						}
+						dataLine = act.getName() + " " + consumed;
+						Files.write(Paths.get(acyclicNoBranching), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
+
+						
+					}
+				}
+				
+			}
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+		return consumption;
+	}
+	
+	private int actionConsumption(Action action) {
+		return action.getInputPattern().getVariables().size();
+	}
+	
+	private List<Transition> getTargetTransitions(FSM fsm, State source) {
+		List<Transition> targets = new ArrayList<Transition>();
+		for (Transition tran : fsm.getTransitions()) {
+			if (tran.getSource() == source) {
+				targets.add(tran);
+			}
+		}
+		
+		return targets;
 	}
 
 	public void guards(String guardCounts, List<NetworkTuple> networkTuples) {
