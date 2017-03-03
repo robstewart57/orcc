@@ -125,12 +125,12 @@ public class DataCollection extends DfVisitor<Void> {
 		String dir = "/home/rob/Documents/rathlin-shared/cal-stats/";
 		List<NetworkTuple> workspaceXdfNetworks = getWorkspaceXdfNetworks();
 
-		// System.out.println("actors vs wires");
-		// actorsVersusWires(dir + "actors-wires.txt", workspaceXdfNetworks);
-		// System.out.println("IO port counts");
-		// actorInputPorts(dir + "actors-ports.txt", workspaceXdfNetworks);
-		// System.out.println("action counts");
-		// actorActions(dir + "actors-actions.txt", workspaceXdfNetworks);
+//		 System.out.println("actors vs wires");
+//		 actorsVersusWires(dir + "actors-wires.txt", workspaceXdfNetworks);
+//		 System.out.println("IO port counts");
+//		 actorInputOutputPorts(dir + "actors-ports.txt", workspaceXdfNetworks);
+		 System.out.println("action counts");
+		 actorActions(dir + "actors-actions.txt", workspaceXdfNetworks);
 		// System.out.println("actions mutating global vars");
 		// mutableGlobalVarsAndStmts(dir + "mutating-actions.txt", dir +
 		// "statements-count.txt", workspaceXdfNetworks);
@@ -159,15 +159,23 @@ public class DataCollection extends DfVisitor<Void> {
 		// hasRepeatPatternPotential(dir + "repeat-potential.txt",
 		// workspaceXdfNetworks);
 
-		// System.out.println("Determinate action");
-		// nonDeterminateAction(dir + "determinate-action.txt",
-		// workspaceXdfNetworks);
+//		 System.out.println("Determinate action");
+//		 nonDeterminateAction(dir + "determinate-action.txt",
+//		 workspaceXdfNetworks);
+		 
+//		 System.out.println("Global variable count");
+//		 actorHasGlobalVariables(dir + "global-variable-count.txt",
+//		 workspaceXdfNetworks);
+		 
 
 //		System.out.println("Guard analysis");
 //		guards(dir + "guards.txt", workspaceXdfNetworks);
+<<<<<<< HEAD
 		
 		System.out.println("Acyclic non-branching consumption");
 		consumptionAcyclicNoBranching(dir + "acyclic-non-branching.txt", workspaceXdfNetworks);
+=======
+>>>>>>> 9ba0ba9e9... Data collection fixes prior to ICGT 2017 submission
 
 		return null;
 	}
@@ -346,9 +354,14 @@ public class DataCollection extends DfVisitor<Void> {
 				actors = thisNetwork.getAllActors();
 
 				for (Actor act : actors) {
+					
+					List<String> globVarNames = new ArrayList<String>();
+					for (Var v : act.getStateVars()) {
+						globVarNames.add(v.getName());
+					}
 
 					for (Action action : act.getActions()) {
-						String s = isDeterminate(action.getBody()) ? "yes" : "no";
+						String s = isDeterminate(action.getBody(),globVarNames) ? "yes" : "no";
 						dataLine = act.getName() + " " + action.getName() + " " + s;
 						Files.write(Paths.get(nonDeterminateAction), (dataLine + "\n").getBytes(),
 								StandardOpenOption.APPEND);
@@ -363,21 +376,55 @@ public class DataCollection extends DfVisitor<Void> {
 		}
 	}
 
-	private boolean isDeterminate(Procedure proc) {
+	private boolean isDeterminate(Procedure proc,List<String> globalVars) {
 		boolean b = true;
 		for (Block block : proc.getBlocks()) {
-			b &= isDeterminate(block);
+			b &= isDeterminate(block,globalVars);
 		}
 		return b;
 	}
 
-	private boolean isDeterminate(Block block) {
+	private boolean isDeterminate(Block block,List<String> globalVars) {
 		boolean b = true;
 		if (block instanceof BlockWhile) {
-			b = false;
+			for (Block bl : ((BlockWhile) block).getBlocks()) {
+				b &= isDeterminate(bl,globalVars);
+			}
+			//b = isDeterminate(block.getProcedure(),globalVars);
 		} else if (block instanceof BlockIf) {
-			b = false;
+			BlockIf ifBlock = (BlockIf) block;
+			List<Block> thenElseBlocks = ifBlock.getThenBlocks();
+			thenElseBlocks.addAll(ifBlock.getElseBlocks());
+			for (Block bl : thenElseBlocks) {
+				b &= isDeterminate(bl,globalVars);
+			}
+			// b = isDeterminate(block.getProcedure(),globalVars);
 		}
+		else if (block instanceof BlockBasic) {
+			b &= !doesBlockAssignToGlobalVar((BlockBasic) block, globalVars);
+		}
+		return b;
+	}
+	
+	private boolean doesBlockAssignToGlobalVar(BlockBasic block,List<String> globalVars) {
+		boolean b = false;
+		
+		for (Instruction inst : block.getInstructions()) {
+			if (inst.isInstAssign()) {
+				InstAssign ass = (InstAssign) inst;
+				boolean assignsToGlobalVar = false;
+				for(String str: globalVars) {
+				    if(str.trim().contains(ass.getTarget().getVariable().getName()))
+				    {
+				      assignsToGlobalVar = true;
+				      System.out.println("TTRRRUUUEEE");
+				    }
+				}
+				
+				b |= assignsToGlobalVar;
+			}
+		}
+		
 		return b;
 	}
 
@@ -986,6 +1033,36 @@ public class DataCollection extends DfVisitor<Void> {
 		return i;
 	}
 
+	public void actorHasGlobalVariables(String filename, List<NetworkTuple> networkTuples) {
+		try {
+			Network thisNetwork;
+			String dataLine;
+			List<Actor> actors;
+			String titleLine = "actor actions";
+			java.io.File f = new java.io.File(filename);
+			List<String> actorsRecorded = new ArrayList<String>();
+			f.delete();
+			Files.write(Paths.get(filename), (titleLine + "\n").getBytes(), StandardOpenOption.CREATE_NEW);
+
+			for (NetworkTuple<IProject, Network> networkTuple : networkTuples) {
+				thisNetwork = networkTuple.network;
+				actors = thisNetwork.getAllActors();
+
+				for (Actor act : actors) {
+					if (!actorsRecorded.contains(act.getName())) {
+						if (act != null && act.getName() != null) {
+							dataLine = act.getName() + " " + act.getStateVars().size();
+							Files.write(Paths.get(filename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
+						}
+						actorsRecorded.add(act.getName());
+					}
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public void actorActions(String filename, List<NetworkTuple> networkTuples) {
 		try {
 			Network thisNetwork;
@@ -1004,8 +1081,10 @@ public class DataCollection extends DfVisitor<Void> {
 				for (Actor act : actors) {
 					if (!actorsRecorded.contains(act.getName())) {
 						if (act != null && act.getName() != null) {
+							if (act.getActions().size() > 0) { // ignore native actors that have no actions
 							dataLine = act.getName() + " " + act.getActions().size();
 							Files.write(Paths.get(filename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
+							}
 						}
 						actorsRecorded.add(act.getName());
 					}
@@ -1016,7 +1095,7 @@ public class DataCollection extends DfVisitor<Void> {
 		}
 	}
 
-	public void actorInputPorts(String filename, List<NetworkTuple> networkTuples) {
+	public void actorInputOutputPorts(String filename, List<NetworkTuple> networkTuples) {
 		try {
 
 			IProject project;
@@ -1036,7 +1115,7 @@ public class DataCollection extends DfVisitor<Void> {
 				project = networkTuple.project;
 				thisNetwork = networkTuple.network;
 				actors = thisNetwork.getAllActors().iterator();
-				while (actors.hasNext())
+				while (actors.hasNext()) {
 					act = actors.next();
 				// for (Actor act : thisNetwork.getAllActors()) {
 				if (!actorsRecorded.contains(act.getName())) {
@@ -1051,10 +1130,12 @@ public class DataCollection extends DfVisitor<Void> {
 					dataLine = act.getName() + " " + inputs + " " + outputs;
 					Files.write(Paths.get(filename), (dataLine + "\n").getBytes(), StandardOpenOption.APPEND);
 					actorsRecorded.add(act.getName());
+					j++;
+				}
 				}
 				// }
-
 			}
+			System.out.println(j + " actors added");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
