@@ -169,6 +169,7 @@ public class DataCollection extends DfVisitor<Void> {
 		 
 
 //		System.out.println("Guard analysis");
+<<<<<<< HEAD
 //		guards(dir + "guards.txt", workspaceXdfNetworks);
 <<<<<<< HEAD
 		
@@ -176,6 +177,11 @@ public class DataCollection extends DfVisitor<Void> {
 		consumptionAcyclicNoBranching(dir + "acyclic-non-branching.txt", workspaceXdfNetworks);
 =======
 >>>>>>> 9ba0ba9e9... Data collection fixes prior to ICGT 2017 submission
+=======
+//		guards(dir + "guards.txt", workspaceXdfNetworks);	
+		//System.out.println("Acyclic non-branching consumption");
+		//consumptionAcyclicNoBranching(dir + "acyclic-non-branching.txt", workspaceXdfNetworks);
+>>>>>>> 36a4be48b... Merge data collection commits
 
 		return null;
 	}
