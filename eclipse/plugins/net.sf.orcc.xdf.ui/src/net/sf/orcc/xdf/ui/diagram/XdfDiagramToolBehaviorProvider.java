@@ -34,6 +34,7 @@ import java.util.List;
 import net.sf.orcc.xdf.ui.features.GroupInstancesFeature;
 import net.sf.orcc.xdf.ui.features.InstanceDblClickFeature;
 import net.sf.orcc.xdf.ui.features.OpenPropertiesFeature;
+import net.sf.orcc.xdf.ui.features.SplitJoinFeature;
 import net.sf.orcc.xdf.ui.features.UngroupNetworkFeature;
 import net.sf.orcc.xdf.ui.features.UpdateRefinementFeature;
 import net.sf.orcc.xdf.ui.features.XronosProfileFeature;
@@ -164,6 +165,19 @@ public class XdfDiagramToolBehaviorProvider extends DefaultToolBehaviorProvider 
 		entry.setText("Transformations");
 		entry.add(new ContextMenuEntry(new GroupInstancesFeature(getFeatureProvider()), context));
 		entry.add(new ContextMenuEntry(new UngroupNetworkFeature(getFeatureProvider()), context));
+		
+		ContextMenuEntry splitJoinEntry = new ContextMenuEntry(null, context);
+		splitJoinEntry.setText("split/join");
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),2), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),4), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),6), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),8), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),10), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),12), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),14), context));
+		splitJoinEntry.add(new ContextMenuEntry(new SplitJoinFeature(getFeatureProvider(),16), context));
+		
+		entry.add(splitJoinEntry);
 		contextMenuEntries.add(entry);
 
 		// 'Highlight costs' menu entry
