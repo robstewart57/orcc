@@ -180,5 +180,6 @@
 		<module>net.sf.orcc.xdf.ui</module>
 		<module>../features/net.sf.orcc</module>
 		<module>net.sf.orcc.site</module>
+		<module>net.sf.orcc.analysis</module>
 	</modules>
 </project>

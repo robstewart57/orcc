@@ -1,0 +1,14 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Analysis
+Bundle-SymbolicName: net.sf.orcc.analysis;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.ui.workbench,
+ org.eclipse.text,
+ net.sf.orcc.backends
+Import-Package: net.sf.orcc.backends.fiacre,
+ net.sf.orcc.df,
+ net.sf.orcc.util,
+ org.eclipse.ui.texteditor

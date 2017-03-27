@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+      <extension
+            point="org.eclipse.ui.menus">
+         <menuContribution
+               allPopups="false"
+               locationURI="menu:org.eclipse.ui.main.menu">
+            <menu
+                  id="orcc.analysis.menu.main"
+                  label="Analysis">
+               <menu
+                     label="Petri net analysis">
+                  <command
+                        commandId="net.sf.orcc.analysis.petrinet"
+                        label="Run TINA Petri net analysis"
+                        style="push">
+                  </command>
+               </menu>
+            </menu>
+         </menuContribution>
+         <menuContribution
+               allPopups="false"
+               locationURI="toolbar:org.eclipse.ui.main.toolbar">
+            <toolbar
+                  id="RobToolbar">
+            </toolbar>
+         </menuContribution>
+      </extension>
+      <extension
+            point="org.eclipse.ui.commands">
+         <command
+               defaultHandler="net.sf.orcc.analysis.PetriNetHandler"
+               id="net.sf.orcc.analysis.petrinet"
+               name="Petri net analysis">
+         </command>
+      </extension>
+      <extension
+            point="org.eclipse.ui.newWizards">
+         <category
+               id="net.sf.orcc.analysis.category1"
+               name="RobCategory">
+         </category>
+      </extension>
+
+</plugin>
