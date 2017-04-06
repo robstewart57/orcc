@@ -36,6 +36,9 @@ import java.util.List;
 import java.util.Map;
 
 import net.sf.orcc.OrccRuntimeException;
+import net.sf.orcc.cal.cal.AstAction;
+import net.sf.orcc.cal.cal.AstActor;
+import net.sf.orcc.cal.cal.AstEntity;
 import net.sf.orcc.cal.cal.AstExpression;
 import net.sf.orcc.cal.cal.AstType;
 import net.sf.orcc.cal.cal.AstTypeBool;
@@ -60,6 +63,9 @@ import net.sf.orcc.cal.services.CalGrammarAccess;
 import net.sf.orcc.cal.services.Typer;
 import net.sf.orcc.cal.ui.internal.CalActivator;
 import net.sf.orcc.cal.util.Util;
+import net.sf.orcc.df.Action;
+import net.sf.orcc.df.Actor;
+import net.sf.orcc.df.DfFactory;
 import net.sf.orcc.ir.ExprInt;
 import net.sf.orcc.ir.ExprList;
 import net.sf.orcc.ir.Expression;
@@ -75,6 +81,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.xtext.IGrammarAccess;
 import org.eclipse.xtext.nodemodel.ICompositeNode;
 import org.eclipse.xtext.nodemodel.ILeafNode;
+import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.eclipse.xtext.parser.IParseResult;
 import org.eclipse.xtext.parser.IParser;
@@ -152,6 +159,23 @@ public class PartialCalParser extends CalSwitch<EObject> {
 		}
 		return null;
 	}
+	
+	public AstActor parseActorAst(final String actorString) {
+		//Injector injector = CalActivator.getInstance().getInjector("net.sf.orcc.cal.Cal");
+		//IParser parser = injector.getInstance(IParser.class);
+		//CalGrammarAccess grammarAccess = (CalGrammarAccess) injector.getInstance(IGrammarAccess.class);
+		Reader reader = new StringReader(actorString);
+		// final IParseResult result = parser.parse(grammarAccess.getAstActorRule(), reader);
+		IParseResult result = parser.parse(grammarAccess.getAstEntityRule(), reader);
+		if (result.hasSyntaxErrors()) {
+			for (INode node : result.getSyntaxErrors()) {
+				System.out.println("Syntax error: " + node.getText());
+			}
+			return null;
+		}
+		AstEntity astActor = (AstEntity) result.getRootASTElement();
+		return astActor.getActor();
+	}
 
 	public boolean isExpression(final String exprString) {
 		final Reader reader = new StringReader(exprString);
@@ -200,7 +224,7 @@ public class PartialCalParser extends CalSwitch<EObject> {
 		}
 		return null;
 	}
-
+	
 	@Override
 	public Type caseAstTypeBool(AstTypeBool type) {
 		return IrFactory.eINSTANCE.createTypeBool();
@@ -255,9 +279,10 @@ public class PartialCalParser extends CalSwitch<EObject> {
 		} else {
 			size = new ExpressionEvaluator().evaluateAsInteger((Expression) doSwitch(astSize));
 		}
-
 		return IrFactory.eINSTANCE.createTypeUint(size);
 	}
+	
+	
 
 	@Override
 	public Expression caseExpressionBinary(ExpressionBinary expression) {
