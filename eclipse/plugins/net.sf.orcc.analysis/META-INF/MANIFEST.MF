@@ -7,8 +7,19 @@ Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Require-Bundle: org.eclipse.ui,
  org.eclipse.ui.workbench,
  org.eclipse.text,
- net.sf.orcc.backends
+ net.sf.orcc.backends,
+ net.sf.orcc.ui,
+ net.sf.orcc.cal,
+ org.eclipse.emf.mwe.core,
+ org.eclipse.m2e.maven.runtime,
+ net.sf.orcc.cal.ui,
+ org.eclipse.xtext,
+ org.eclipse.emf.common,
+ org.eclipse.emf.ecore,
+ org.eclipse.xtext.generator,
+ org.eclipse.core.resources
 Import-Package: net.sf.orcc.backends.fiacre,
  net.sf.orcc.df,
  net.sf.orcc.util,
- org.eclipse.ui.texteditor
+ org.eclipse.ui.texteditor,
+ org.eclipse.xtext.parser
