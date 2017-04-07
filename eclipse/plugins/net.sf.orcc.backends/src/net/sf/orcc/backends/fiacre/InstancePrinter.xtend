@@ -95,6 +95,10 @@ class InstancePrinter extends CommonPrinter {
 	protected var Map<Port, Connection> incomingPortMap
 	protected var Map<Port, List<Connection>> outgoingPortMap
 	protected var String entityName
+	
+	def public setActor(Actor actor) {
+		this.actor = actor;
+	}
 
 	def public getFileContent() {
 
