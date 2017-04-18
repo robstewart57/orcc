@@ -326,15 +326,17 @@ component «actor.simpleName»_interaction is
 
 	def private inlineActionsIntoFSM(FSM fsm) {
 		var Map<State, List<ActionTargetState>> inlinedFSM = new HashMap()
-		for (Transition t : fsm.transitions) {
-			if (inlinedFSM.containsKey(t.source)) {
-				var List<ActionTargetState> existingList = inlinedFSM.get(t.source)
-				existingList.add(new ActionTargetState(t.action, t.target))
-				inlinedFSM.put(t.source, existingList)
-			} else {
-				var List<ActionTargetState> newList = new ArrayList
-				newList.add(new ActionTargetState(t.action, t.target))
-				inlinedFSM.put(t.source, newList)
+		if (fsm != null) {
+			for (Transition t : fsm.transitions) {
+				if (inlinedFSM.containsKey(t.source)) {
+					var List<ActionTargetState> existingList = inlinedFSM.get(t.source)
+					existingList.add(new ActionTargetState(t.action, t.target))
+					inlinedFSM.put(t.source, existingList)
+				} else {
+					var List<ActionTargetState> newList = new ArrayList
+					newList.add(new ActionTargetState(t.action, t.target))
+					inlinedFSM.put(t.source, newList)
+				}
 			}
 		}
 		inlinedFSM

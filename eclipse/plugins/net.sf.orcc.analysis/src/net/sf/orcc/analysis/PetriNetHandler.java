@@ -47,20 +47,11 @@ import net.sf.orcc.util.OrccLogger;
  * @author Rob Stewart
  *
  */
-public class PetriNetHandler extends AbstractHandler implements ILaunchConfigurationDelegate {
+public class PetriNetHandler extends AbstractHandler {
 
 	@Override
 	public boolean isEnabled() {
 		return true;
-	}
-	
-	@Override
-	public void launch(ILaunchConfiguration configuration, String mode, ILaunch launch, IProgressMonitor monitor)
-			throws CoreException {
-		// TODO Auto-generated method stub
-		
-		OrccLogger.traceln("Hello ?");
-		
 	}
 
 	@Override
@@ -71,6 +62,14 @@ public class PetriNetHandler extends AbstractHandler implements ILaunchConfigura
 		String fracExec = findExecutableOnPath("frac");
 		String fracPath = findSystemVariable("FRACDIR");
 		String tinaPath = findSystemVariable("TINADIR");
+		
+		if (fracExec.equals("")) {
+			OrccLogger.warnln("Unable to find 'frac' executable in PATH");
+		} else if (fracPath.equals("")) {
+			OrccLogger.warnln("Unable to find 'FRACDIR' system variable");
+		} else if (tinaPath.equals("")) {
+			OrccLogger.warnln("Unable to find 'TINADIR' system variable");
+		} else {
 
 		// get workbench window
 		IEditorPart editorPart = HandlerUtil.getActiveEditor(event);
@@ -102,7 +101,8 @@ public class PetriNetHandler extends AbstractHandler implements ILaunchConfigura
 		InstancePrinter instancePrinter = new InstancePrinter();
 		instancePrinter.setActor(actor);
 		
-		OrccLogger.traceln(instancePrinter.getFileContent());
+		//OrccLogger.traceln(instancePrinter.getFileContent());
+		System.out.println(instancePrinter.getFileContent());
 		
 		FilesManager.writeFile(instancePrinter.getFileContent(), srcPath, actor.getSimpleName() + ".fcr");
 
@@ -114,10 +114,10 @@ public class PetriNetHandler extends AbstractHandler implements ILaunchConfigura
 		
 		/* Fiacre `frac` succeeded */
 		if (fiacreExitValue == 0) {
-			OrccLogger.traceln("'frac' successful.");
-			OrccLogger.traceln("compiling Fiacre specification...");
+			//OrccLogger.traceln("'frac' successful.");
+			//OrccLogger.traceln("compiling Fiacre specification...");
 			String fracMakeCommand = "make -f " + fracPath + "/Makefile " + "FRACLIB=" + fracPath + "/lib/ --directory=" + srcPath + " " + actor.getSimpleName();
-			OrccLogger.traceln(fracMakeCommand);
+			//OrccLogger.traceln(fracMakeCommand);
 			int fracMakeExitValue = runProcess("Fiacre make", fracMakeCommand);
 			
 			/* if `make` succeeded */ 
@@ -126,13 +126,16 @@ public class PetriNetHandler extends AbstractHandler implements ILaunchConfigura
 			}
 		}
 		else {
-			OrccLogger.traceln("'frac' failed with exit value " + fiacreExitValue);
+			//OrccLogger.traceln("'frac' failed with exit value " + fiacreExitValue);
 		}
 		}
 	
 		 catch (TimeoutException e) {
-				OrccLogger.traceln("TINA imed out: " + e.getStackTrace().toString());
+				//OrccLogger.traceln("TINA imed out: " + e.getStackTrace().toString());
 			}
+		
+		
+		}
 
 		return null;
 	}
@@ -156,7 +159,7 @@ public class PetriNetHandler extends AbstractHandler implements ILaunchConfigura
 				while ((ch = inStream.read()) != -1)
 					sb.append((char) ch);
 				String stdOut = sb.toString();
-				OrccLogger.traceln(stdOut);
+				//OrccLogger.traceln(stdOut);
 
 				inStream = process.getErrorStream();
 				sb = new StringBuilder();
@@ -164,10 +167,10 @@ public class PetriNetHandler extends AbstractHandler implements ILaunchConfigura
 					sb.append((char) ch);
 				stdOut = sb.toString();
 				if (!stdOut.startsWith("")) {
-					OrccLogger.warnln(stdOut);
+					//OrccLogger.warnln(stdOut);
 				}
 				
-				OrccLogger.traceln(informalName + " done.");
+				//OrccLogger.traceln(informalName + " done.");
 			    if (worker.exit != null) {
 			    	return process.exitValue();
 			    }
