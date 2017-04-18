@@ -123,6 +123,8 @@ process «actor.simpleName» [«printPorts(actor.inputs)» , «printPorts(actor.
 
 /* simulation process to communicate with actor process */
 process «actor.simpleName»_dual [«listPortNamesDual(actor)»] is
+    var x : int
+    «printDualConsumersProducers(actor)»
 
 
 /* simulate IO with the actor */
@@ -455,12 +457,23 @@ component «actor.simpleName»_interaction is
 	def private listPortNamesDual(Actor actor) {
 		var List<String> fiacreVars = new ArrayList()
 		for (Port p : actor.outputs) {
-			fiacreVars.add(p.name)
+			fiacreVars.add(p.name + " : " + printType(p.type))
 		}
 		for (Port p : actor.inputs) {
-			fiacreVars.add(p.name)
+			fiacreVars.add(p.name + " : " + printType(p.type))
 		}
 		delimitWith(fiacreVars, ",")
+	}
+	
+	def private printDualConsumersProducers(Actor actor) {
+		var List<String> fiacreConsumerProducer = new ArrayList()
+		for (Port p : actor.inputs) {
+			fiacreConsumerProducer.add("from s0 " + p.name + "!0 to s0")
+		}
+		for (Port p : actor.outputs) {
+			fiacreConsumerProducer.add("from s0 " + p.name + "?x to s0")
+		}
+		delimitWith(fiacreConsumerProducer, "\n")
 	}
 
 	def private componentPorts(Actor actor) {
