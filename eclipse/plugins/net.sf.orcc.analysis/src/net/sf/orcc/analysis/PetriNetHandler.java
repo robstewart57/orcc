@@ -101,10 +101,11 @@ public class PetriNetHandler extends AbstractHandler {
 		InstancePrinter instancePrinter = new InstancePrinter();
 		instancePrinter.setActor(actor);
 		
-		OrccLogger.traceln(instancePrinter.getFileContent());
-		System.out.println(instancePrinter.getFileContent());
+		String fiacreContent = instancePrinter.getFileContent().toString();
 		
-		FilesManager.writeFile(instancePrinter.getFileContent(), srcPath, actor.getSimpleName() + ".fcr");
+		OrccLogger.traceln(fiacreContent);
+		
+		FilesManager.writeFile(fiacreContent, srcPath, actor.getSimpleName() + ".fcr");
 
 		/* run TINA out the generated file */
 		int fiacreExitValue;
@@ -159,7 +160,7 @@ public class PetriNetHandler extends AbstractHandler {
 				while ((ch = inStream.read()) != -1)
 					sb.append((char) ch);
 				String stdOut = sb.toString();
-				//OrccLogger.traceln(stdOut);
+				OrccLogger.traceln(stdOut);
 
 				inStream = process.getErrorStream();
 				sb = new StringBuilder();
@@ -167,7 +168,7 @@ public class PetriNetHandler extends AbstractHandler {
 					sb.append((char) ch);
 				stdOut = sb.toString();
 				if (!stdOut.startsWith("")) {
-					//OrccLogger.warnln(stdOut);
+					OrccLogger.warnln(stdOut);
 				}
 				
 				OrccLogger.traceln(informalName + " done.");
