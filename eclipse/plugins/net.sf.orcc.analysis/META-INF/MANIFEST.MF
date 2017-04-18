@@ -1,10 +1,12 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Analysis
+undle-Name: RVC-CAL analysis tools
+Bundle-Vendor: Heriot-Watt University
+Bundle-Version: 2.3.1.qualifier
 Bundle-SymbolicName: net.sf.orcc.analysis;singleton:=true
-Bundle-Version: 1.0.0.qualifier
-Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-ActivationPolicy: lazy
 Require-Bundle: net.sf.orcc.cal;bundle-version="2.3.1";visibility:=reexport,
+ net.sf.orcc.core;bundle-version="2.3.1";visibility:=reexport,
  org.antlr.runtime;bundle-version="3.2.0",
  org.eclipse.compare;bundle-version="3.5.0",
  org.eclipse.jdt.core;bundle-version="3.7.0",
@@ -21,6 +23,5 @@ Require-Bundle: net.sf.orcc.cal;bundle-version="2.3.1";visibility:=reexport,
 Import-Package: net.sf.orcc.backends.cal,
  net.sf.orcc.backends.fiacre,
  net.sf.orcc.df,
- net.sf.orcc.util,
  org.eclipse.ui.texteditor,
  org.eclipse.xtext.parser
