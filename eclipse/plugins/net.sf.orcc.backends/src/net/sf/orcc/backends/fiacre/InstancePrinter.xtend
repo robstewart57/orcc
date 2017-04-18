@@ -214,33 +214,113 @@ component «actor.simpleName»_interaction is
 		'''
 			on guard «firstCommPattern(transAction)»
 			«printStatements(statementsInTransitionAction)»
-			«printTo(transAction.inputPattern, transAction.outputPattern,
+			«printTo(transAction, transAction.inputPattern, transAction.outputPattern,
 			sourceState, transDestState)»
 		'''
 	}
+	
+	static class PortTokens {
+		String p
+	    List<String> tokenVars
 
-	def private printTo(Pattern inputPattern, Pattern outputPattern, State sourceState, State destState) {
+		new(String p, List<String> ts) {
+			this.p = p;
+			this.tokenVars = ts;
+		}
+
+		def getPort() { p; }
+
+		def getTokens() { tokenVars; }
+	}
+	
+
+	def private printTo(Action transAction, Pattern inputPattern, Pattern outputPattern, State sourceState, State destState) {
 		var String fiacreTo = ""
 		if (inputPattern.ports.size == 0 && outputPattern.ports.size == 0) {
 			fiacreTo = "to " + destState.name
 		} else {
+			var inputs = patternMap(transAction)
+			var outputs = patternMap(transAction)
 			topLevelStateTransitions.add(
-				printSingleComm(inputPattern, outputPattern, sourceState,
+				printSingleComm(inputs, outputs, sourceState,
 					destState, 2)
 				)
+			fiacreTo = "to " + sourceState.name + "_2"
 		}
 
 		fiacreTo
 	}
 	
-	def private printSingleComm(Pattern inputPattern, Pattern outputPattern, State sourceState, State destState, int n) {
-	var String str = ""
-	if (inputPattern.ports.size == 0
-		&& outputPattern.ports.size == 0) {
-			"from " + sourceState.name + "_" + n + " ; to " + destState.name			
+	def private String printSingleComm(List<PortTokens> inputs, List<PortTokens> outputs, State sourceState,
+		State destState, int n) {
+		var String str = ""
+		if (inputs.size == 0 && outputs.size == 0) {
+			str = "from " + sourceState.name + "_" + n + " ; to " + destState.name
+		} else if (inputs.size > 0 && inputs.get(0).getTokens.length == 1) {
+			str = "from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token" + " to " + sourceState.name +
+				"_" + (n + 1) + printSingleComm(new ArrayList, outputs, sourceState, destState, n + 1)
+		} else if (inputs.size > 0) {
+			str = "from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token" + " to " + sourceState.name +
+				"_" + (n + 1)
+
+			inputs.get(0).getTokens.remove(0)
+			str += " " + printSingleComm(inputs, outputs, sourceState, destState, n + 1)
+		} else if (inputs.size == 0 && outputs.size == 1 && outputs.get(0).getTokens.size==1) {
+			str = "from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0" + " to " + sourceState + "_" +
+				(n + 1) + printSingleComm(new ArrayList, new ArrayList, sourceState, destState, n + 1)
+		} else if (inputs.size == 0 && outputs.size > 0) {
+			str = "from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0" + " to " + sourceState + "_" +
+				(n + 1)
+				if (outputs.get(0).getTokens.size > 0) {
+			outputs.get(0).getTokens.remove(0)
+			} else if (outputs.get(0).getTokens.size == 0) {
+				outputs.remove(0)
+			}
+			
+			str += " " + printSingleComm(inputs, outputs, sourceState, destState, n+1)
+			
+			}
+//		} else if (inputs.size == 0 && outputs.size > 1) {
+//			str = "from " + sourceState.name + "_" + n + outputs.get(0).getPort + "!0" + " to " + sourceState + "_" +
+//				(n + 1)
+//		}
+		else{
+			System.out.println("printSingleComm: non exhaustive pattern matching.")
 		}
-	
-	str
+
+		str
+	}
+
+	def private patternMap(Action action) {
+		var Map<String,List<String>> portTokenMap = new HashMap<String,List<String>>
+		for (Instruction inst : allInstructionsInBody(action.body)) {
+			switch (inst) {
+				InstLoad : {
+				var instLoad = (inst as InstLoad)
+				System.out.println(inst.target.variable.name + " " + inst.source.variable.name + " " + inst.indexes.get(0))
+				// var position = (inst.indexes.get(0) as ExprInt)
+				if (portTokenMap.containsKey(instLoad.target.variable.name)) {
+					portTokenMap.get(instLoad.target.variable.name)
+					.add( inst.source.variable.name)
+				}
+				else {
+				portTokenMap.put(instLoad.target.variable.name, new ArrayList)
+				portTokenMap.get(instLoad.target.variable.name)
+					.add(inst.source.variable.name)
+				}
+				}
+				default : { }
+			}
+		}
+		
+		
+		var List<PortTokens> patternMap = new ArrayList<PortTokens>
+		for (Entry<String,List<String>> entry : portTokenMap.entrySet) {
+			patternMap.add(new PortTokens(entry.key, entry.value))
+		}
+		
+		
+		patternMap
 	}
 
 	def private printStatements(List<Instruction> statements) {
@@ -307,6 +387,7 @@ component «actor.simpleName»_interaction is
 		delimitWith(argsStrs, "+")
 	}
 
+    // TODO
 	def private printChoices(State source, List<ActionTargetState> rest) {
 	}
 
