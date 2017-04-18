@@ -76,6 +76,11 @@ import net.sf.orcc.ir.Var
 import net.sf.orcc.util.Attributable
 import org.eclipse.emf.common.util.EList
 import net.sf.orcc.backends.CommonPrinter
+import net.sf.orcc.df.Pattern
+import net.sf.orcc.df.FSM
+import net.sf.orcc.df.State
+import net.sf.orcc.df.Transition
+import net.sf.orcc.ir.Procedure
 
 /**
  * Generate and print instance source files for the CAL actors,
@@ -96,6 +101,8 @@ class InstancePrinter extends CommonPrinter {
 	protected var Map<Port, List<Connection>> outgoingPortMap
 	protected var String entityName
 	
+	protected var List<String> topLevelStateTransitions = new ArrayList
+
 	def public setActor(Actor actor) {
 		this.actor = actor;
 	}
@@ -106,9 +113,526 @@ class InstancePrinter extends CommonPrinter {
 		var int numOutputs = actor.getOutputs().size()
 		packageDir = actor.package.replaceAll("\\.", "/") + "/"
 
+		'''
+process «actor.simpleName» [«printPorts(actor.inputs)» , «printPorts(actor.outputs)» ] is
+    state «printStates(actor)»
+    var «printPrivateVars(actor.stateVars)» , token : int
+    «printTransitions(actor)»
+    
+    «printTopLevelAtomicTransitions(topLevelStateTransitions)»
+
+/* simulation process to communicate with actor process */
+process «actor.simpleName»_dual [«listPortNamesDual(actor)»] is
+
+
+/* simulate IO with the actor */
+component «actor.simpleName»_interaction is
+   port «componentPorts(actor)»
+   par * in
+       «actor.simpleName» [«listPortNames(actor)»]
+    || «actor.simpleName»_dual [«listPortNamesDual(actor)»]
+    end
+    
+/* entry point */
+«actor.simpleName»_interaction
 '''
-process blur [in1:in int, out1:out int] is
-'''
-		
+	}
+	
+	def private printTopLevelAtomicTransitions(List<String> atomicTransitions) {
+		delimitWith(topLevelStateTransitions, "\n")
+	}
+
+	def private printTransitions(Actor actor) {
+		var List<String> fiacreTransitions = new ArrayList()
+		var Map<State, List<ActionTargetState>> inlinedFSM = inlineActionsIntoFSM(actor.fsm)
+		var entries = inlinedFSM.entrySet
+		for (Entry<State,List<ActionTargetState>> entry : entries) {
+			fiacreTransitions.add(printTransitionsFromState(entry).toString)
 		}
+
+		delimitWith(fiacreTransitions, "\n")
+	}
+
+	def private printTransitionsFromState(Entry<State, List<ActionTargetState>> entry) {
+		'''
+			from «entry.key» select 
+			«printTransition(entry.key, entry.value.get(0))»
+			«printChoices(entry.key, entry.value.subList(1,entry.value.size))»
+			end
+		'''
+	}
+
+	def private firstCommPattern(Action action) {
+		var String fiacrePattern = ""
+		if (action.inputPattern.ports.size == 0 && action.outputPattern.ports.size == 0) {
+			fiacrePattern = "true"
+		} else if (action.inputPattern.ports.size == 0) {
+			fiacrePattern = action.outputPattern.ports.get(0).name + "!0"
+		} else {
+			var Var inVar = action.inputPattern.getVariable(
+				action.inputPattern.ports.get(0)
+			)
+			var String firstInVar = getFirstToken(action, action.inputPattern.ports.get(0).name, inVar)
+			fiacrePattern = firstInVar
 		}
+		fiacrePattern
+	}
+
+	def getFirstToken(Action action, String portName, Var inVar) {
+		var String tokenVar = ""
+		var String pattern = ""
+		var BlockBasic block = action.body.first
+		var instIter = block.instructions.listIterator
+		var found = false
+		while (!found && instIter.hasNext) {
+			var Instruction inst = instIter.next
+			switch (inst) {
+				InstLoad: {
+					if (!inst.indexes.isEmpty) {
+						var ExprInt index = (inst.indexes.get(0) as ExprInt)
+						if (index == 0) {
+							tokenVar = inst.target.variable.name
+							found = true
+						}
+					}
+				}
+			}
+		}
+		if (!found) {
+			pattern = "true"
+		} else {
+			pattern = portName + "?" + tokenVar
+		}
+		pattern
+	}
+
+	def private printTransition(State sourceState, ActionTargetState transition) {
+		var Action transAction = transition.getTransitionAction
+		var State transDestState = transition.getTargetState
+		var List<Instruction> statementsInTransitionAction = allInstructionsInBody(transAction.body)
+
+		'''
+			on guard «firstCommPattern(transAction)»
+			«printStatements(statementsInTransitionAction)»
+			«printTo(transAction.inputPattern, transAction.outputPattern,
+			sourceState, transDestState)»
+		'''
+	}
+
+	def private printTo(Pattern inputPattern, Pattern outputPattern, State sourceState, State destState) {
+		var String fiacreTo = ""
+		if (inputPattern.ports.size == 0 && outputPattern.ports.size == 0) {
+			fiacreTo = "to " + destState.name
+		} else {
+			topLevelStateTransitions.add(
+				printSingleComm(inputPattern, outputPattern, sourceState,
+					destState, 2)
+				)
+		}
+
+		fiacreTo
+	}
+	
+	def private printSingleComm(Pattern inputPattern, Pattern outputPattern, State sourceState, State destState, int n) {
+	var String str = ""
+	if (inputPattern.ports.size == 0
+		&& outputPattern.ports.size == 0) {
+			"from " + sourceState.name + "_" + n + " ; to " + destState.name			
+		}
+	
+	str
+	}
+
+	def private printStatements(List<Instruction> statements) {
+		var List<String> fiacreStatements = new ArrayList()
+		for (Instruction inst : statements) {
+			fiacreStatements.add(printInstruction(inst).toString)
+		}
+		delimitWith(fiacreStatements, "\n")
+	}
+
+	def protected printInstruction(Instruction inst) {
+		// TODO implement printer for all instructions
+		val String instPrinted = switch inst {
+			InstAssign:
+				inst.target.variable.name + " := " + printExpression(inst.value) + ";"
+			InstCall:
+				inst.procedure.name + "(" + printArgs(inst.arguments) + ");"
+			InstLoad:
+				"" // loads are ignored.
+			InstPhi:
+				""
+			InstReturn:
+				""
+			InstStore:
+				if (isTargetOutputPort(inst.target.variable.name))
+					""
+				else
+					inst.target.variable.name + " := " + printExpression(inst.value) + ";"
+			default:
+				"" // covers backend specific instructions
+		}
+
+		'''«instPrinted»'''
+	}
+
+	def protected isTargetInputPort(String str) {
+		var boolean b
+		for (Port p : actor.inputs) {
+			if (str.equals(p.name)) {
+				b = true
+			}
+		}
+		return b
+	}
+
+	def protected isTargetOutputPort(String str) {
+		var boolean b
+		for (Port p : actor.outputs) {
+			if (str.equals(p.name)) {
+				b = true
+			}
+		}
+		return b
+	}
+
+	def protected printArgs(EList<Arg> args) {
+		var List<String> argsStrs = new ArrayList()
+		for (Arg arg : args) {
+			if (arg.isByVal()) {
+				val exp = (arg as ArgByVal).value
+				argsStrs.add(printExpression(exp).toString)
+			}
+		}
+		delimitWith(argsStrs, "+")
+	}
+
+	def private printChoices(State source, List<ActionTargetState> rest) {
+	}
+
+	static class ActionTargetState {
+		Action transitionAction
+		State targetState
+
+		new(Action a, State s) {
+			transitionAction = a;
+			targetState = s;
+		}
+
+		def getTransitionAction() { transitionAction; }
+
+		def getTargetState() { targetState; }
+	}
+
+	def private inlineActionsIntoFSM(FSM fsm) {
+		var Map<State, List<ActionTargetState>> inlinedFSM = new HashMap()
+		for (Transition t : fsm.transitions) {
+			if (inlinedFSM.containsKey(t.source)) {
+				var List<ActionTargetState> existingList = inlinedFSM.get(t.source)
+				existingList.add(new ActionTargetState(t.action, t.target))
+				inlinedFSM.put(t.source, existingList)
+			} else {
+				var List<ActionTargetState> newList = new ArrayList
+				newList.add(new ActionTargetState(t.action, t.target))
+				inlinedFSM.put(t.source, newList)
+			}
+		}
+		inlinedFSM
+	}
+
+	def private listPortNames(Actor actor) {
+		var List<String> fiacreVars = new ArrayList()
+		for (Port p : actor.inputs) {
+			fiacreVars.add(p.name)
+		}
+		for (Port p : actor.outputs) {
+			fiacreVars.add(p.name)
+		}
+		delimitWith(fiacreVars, ",")
+	}
+
+	def private listPortNamesDual(Actor actor) {
+		var List<String> fiacreVars = new ArrayList()
+		for (Port p : actor.outputs) {
+			fiacreVars.add(p.name)
+		}
+		for (Port p : actor.inputs) {
+			fiacreVars.add(p.name)
+		}
+		delimitWith(fiacreVars, ",")
+	}
+
+	def private componentPorts(Actor actor) {
+		var List<String> fiacreVars = new ArrayList()
+		for (Port p : actor.inputs) {
+			fiacreVars.add(p.name + " : " + printType(p.type))
+		}
+		for (Port p : actor.outputs) {
+			fiacreVars.add(p.name + " : " + printType(p.type))
+		}
+		delimitWith(fiacreVars, ",")
+	}
+
+	def private printStates(Actor actor) {
+		var int numComms = numCommunications(actor)
+		var List<String> fiacreStates = new ArrayList()
+		for (i : 0 ..< numComms) {
+			fiacreStates.add("s" + i)
+		}
+		delimitWith(fiacreStates, ",")
+	}
+
+	def private numCommunications(Actor actor) {
+		var int i = 0
+		for (Action action : actor.actions) {
+			var Pattern inPattern = action.inputPattern
+			for (Port p : actor.inputs) {
+				i += inPattern.getNumTokens(p)
+			}
+			for (Port p : actor.outputs) {
+				i += inPattern.getNumTokens(p)
+			}
+			var Pattern outPattern = action.outputPattern
+			for (Port p : actor.inputs) {
+				i += outPattern.getNumTokens(p)
+			}
+			for (Port p : actor.outputs) {
+				i += outPattern.getNumTokens(p)
+			}
+		}
+		i
+	}
+
+	def private printPrivateVars(EList<Var> vars) {
+		var List<String> fiacreVars = new ArrayList()
+		for (Var v : vars) {
+			fiacreVars.add(printPrivateVar(v))
+		}
+		delimitWith(fiacreVars, ",")
+	}
+
+	def private printPrivateVar(Var v) {
+		v.name + " : " + printType(v.type)
+	}
+
+	def private printPorts(EList<Port> ports) {
+		var List<String> fiacrePorts = new ArrayList()
+		for (Port port : ports) {
+			fiacrePorts.add(port.name + ": " + printType(port.type))
+		}
+		delimitWith(fiacrePorts, ",")
+	}
+
+	def private printType(Type type) {
+		switch type {
+			TypeBool: "bool"
+			// TypeFloat: "float"
+			TypeInt: "int"
+			TypeUint: "int"
+			default: "int" // what should this be?
+		}
+	}
+
+	def protected List<Instruction> allInstructionsInBody(Procedure body) {
+		var List<Instruction> actionInstructions = new ArrayList
+		for (Block block : body.blocks) {
+			for (Instruction inst : allInstructionsInBlock(block)) {
+				actionInstructions.add(inst)
+			}
+		}
+		actionInstructions
+	}
+
+	def protected List<Instruction> allInstructionsInBlock(Block block) {
+		switch block {
+			BlockBasic: instructionsFromBlockBasic(block)
+			BlockIf: instructionsFromBlockIf(block)
+			BlockWhile: instructionsFromBlockWhile(block)
+		}
+	}
+
+	def protected instructionsFromBlockBasic(BlockBasic block) {
+		block.instructions
+	}
+
+	def protected instructionsFromBlockIf(BlockIf block) {
+		var List<Instruction> instructions = new ArrayList
+		for (Block thenBlock : block.thenBlocks) {
+			instructions.addAll(allInstructionsInBlock(thenBlock))
+		}
+		for (Block elseBlock : block.elseBlocks) {
+			instructions.addAll(allInstructionsInBlock(elseBlock))
+		}
+		instructions
+	}
+
+	def protected instructionsFromBlockWhile(BlockWhile block) {
+		var List<Instruction> instructions = new ArrayList
+		for (Block subBlock : block.blocks) {
+			instructions.addAll(allInstructionsInBlock(subBlock))
+		}
+		instructions
+	}
+
+//
+	def protected printList(ExprList list) {
+		var List<String> elems = new ArrayList<String>()
+		for (Expression exp : list.value) {
+			elems.add(printExpression(exp).toString)
+		}
+		delimitWith(elems, ",")
+	}
+
+//
+	def protected CharSequence printExpression(Expression exp) {
+		val String expPrinted = switch exp {
+			ExprBinary: printBinaryExpr(exp).toString
+			ExprBool: if(exp.isValue) "true" else "false"
+			ExprFloat: exp.value.toString
+			ExprInt: Integer.toString(exp.intValue)
+			ExprList: printList(exp)
+			ExprString: "\"" + exp.value + "\""
+			ExprUnary: printUnaryOp(exp.op).toString
+			ExprVar: printLocalVarExpr(exp)
+		}
+		'''«expPrinted»'''
+	}
+
+//
+	def protected printLocalVarExpr(ExprVar exp) {
+		exp.use.variable.name.replace("local_", "")
+	}
+
+//
+	def protected printUnaryOp(OpUnary op) {
+		val String opPrinted = switch (op) {
+			case BITNOT: "not"
+			case LOGIC_NOT: "not"
+			case MINUS: "-"
+			case NUM_ELTS: ""
+			default: ""
+		}
+		'''«opPrinted»'''
+	}
+
+//
+	def protected printBinaryExpr(ExprBinary exp) {
+		val e1 = exp.getE1()
+		val e1WellFormed = if (e1.isExprBinary)
+				("(" + printExpression(e1).toString + ")")
+			else
+				printExpression(e1).toString
+
+		val e2 = exp.getE2()
+		val e2WellFormed = if (e2.isExprBinary)
+				("(" + printExpression(e2).toString + ")")
+			else
+				printExpression(e2).toString
+		val expWellFormed = e1WellFormed + " " + printBinaryOp(exp.getOp) + " " + e2WellFormed
+
+		'''«expWellFormed»'''
+	}
+
+//
+//	def protected printLocalVars(Action action) {
+//		val EList<Var> locals = action.body.locals
+//		var List<String> varDecls = new ArrayList<String>()
+//		var List<String> inPatternVars = inputPatternVars(action)
+//		for (Var localVar : locals) {
+//			if (!inPatternVars.contains(localVar.name))
+//				varDecls.add(printType(localVar.type) + " " + formatVarName(localVar.name))
+//		}
+//		if (varDecls.size() > 0) '''
+//			var
+//			«delimitWith(varDecls,",")»
+//		''' else ''''''
+//	}
+//
+//	def protected formatVarName(String s) {
+//		s.replace("local_", "")
+//	}
+//
+//	def protected inputPatternVars(Action action) {
+//		var Map<String, List<String>> inputMap = new HashMap
+//		for (Instruction inst : action.body.first.instructions) {
+//			if (inst instanceof InstLoad) {
+//				var instLoad = inst as InstLoad
+//				if (isTargetInputPort(instLoad.source.variable.name)) {
+//					var List<String> previousList = new ArrayList
+//					if (inputMap.get(instLoad.source.variable.name) != null) {
+//						previousList = inputMap.get(instLoad.source.variable.name)
+//					}
+//					val token = formatVarName(instLoad.target.variable.name)
+//					previousList.add(token)
+//					inputMap.put(instLoad.source.variable.name, previousList)
+//				}
+//			}
+//		}
+//
+//		var List<String> inPatternVars = new ArrayList
+//		for (Entry<String,List<String>> entry : inputMap.entrySet) {
+//			for (String varStr : entry.value) {
+//				inPatternVars.add(varStr)
+//			}
+//		}
+//		inPatternVars
+//	}
+//
+//	def protected isTargetInputPort(String str) {
+//		var boolean b
+//		for (Port p : actor.inputs) {
+//			if (str.equals(p.name)) {
+//				b = true
+//			}
+//		}
+//		return b
+//	}
+//
+//	def protected isTargetOutputPort(String str) {
+//		var boolean b
+//		for (Port p : actor.outputs) {
+//			if (str.equals(p.name)) {
+//				b = true
+//			}
+//		}
+//		return b
+//	}
+//
+	def protected printBinaryOp(OpBinary op) {
+		val String opPrinted = switch (op) {
+			case BITAND: "&"
+			case BITOR: "|"
+			case BITXOR: "^"
+			case DIV: "/"
+			case DIV_INT: "/"
+			case EQ: "="
+			case GE: ">="
+			case GT: ">"
+			case LE: "<"
+			case LOGIC_AND: "&&"
+			case LOGIC_OR: "||"
+			case LT: "<"
+			case MINUS: "-"
+			case MOD: "mod"
+			case NE: "!="
+			case PLUS: "+"
+			case SHIFT_LEFT: "<<"
+			case SHIFT_RIGHT: ">>"
+			case TIMES: "*"
+			default: ""
+		}
+		'''«opPrinted»'''
+	}
+
+//
+	def protected delimitWith(List<String> strList, String delimChar) {
+		var StringBuilder sb = new StringBuilder();
+		var String delim = "";
+		for (String i : strList) {
+			sb.append(delim).append(i);
+			delim = delimChar;
+		}
+		sb.toString()
+	}
+
+}
