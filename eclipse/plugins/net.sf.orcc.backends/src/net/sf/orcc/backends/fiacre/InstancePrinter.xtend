@@ -115,14 +115,15 @@ class InstancePrinter extends CommonPrinter {
 
 		'''
 process «actor.simpleName» [«printPorts(actor.inputs)» , «printPorts(actor.outputs)» ] is
-    state «printStates(actor)»
+    states «printStates(actor)»
     var «printPrivateVars(actor.stateVars)» token : int
     «printTransitions(actor)»
     
     «printTopLevelAtomicTransitions(topLevelStateTransitions)»
 
 /* simulation process to communicate with actor process */
-process «actor.simpleName»_dual [«listPortNamesDual(actor)»] is
+process «actor.simpleName»_dual [«listPortNamesDualWithTypes(actor)»] is
+    «printDualStates(actor)»
     var x : int
     «printDualConsumersProducers(actor)»
 
@@ -177,7 +178,7 @@ component «actor.simpleName»_interaction is
 			var String firstInVar = getFirstToken(action, action.inputPattern.ports.get(0).name, inVar)
 			fiacrePattern = firstInVar
 		}
-		fiacrePattern
+		fiacrePattern + ";"
 	}
 
 	def getFirstToken(Action action, String portName, Var inVar) {
@@ -214,7 +215,7 @@ component «actor.simpleName»_interaction is
 		var List<Instruction> statementsInTransitionAction = allInstructionsInBody(transAction.body)
 
 		'''
-			on guard «firstCommPattern(transAction)»
+			on «firstCommPattern(transAction)»
 			«printStatements(statementsInTransitionAction)»
 			«printTo(transAction, transAction.inputPattern, transAction.outputPattern,
 			sourceState, transDestState)»
@@ -257,21 +258,21 @@ component «actor.simpleName»_interaction is
 		State destState, int n) {
 		var String str = ""
 		if (inputs.size == 0 && outputs.size == 0) {
-			str = " from " + sourceState.name + "_" + n + " ; to " + destState.name
+			str = " from " + sourceState.name + "_" + n + " to " + destState.name
 		} else if (inputs.size > 0 && inputs.get(0).getTokens.length == 1) {
-			str = " from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token" + " to " + sourceState.name +
+			str = " from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token;" + " to " + sourceState.name +
 				"_" + (n + 1) + "\n " + printSingleComm(inputs.subList(1,inputs.size), outputs, sourceState, destState, n + 1)
 		} else if (inputs.size > 0) {
-			str = " from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token" + " to " + sourceState.name +
+			str = " from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token;" + " to " + sourceState.name +
 				"_" + (n + 1)
 
 			inputs.get(0).getTokens.remove(0)
 			str += "\n " + printSingleComm(inputs, outputs, sourceState, destState, n + 1)
 		} else if (inputs.size == 0 && outputs.size == 1 && outputs.get(0).getTokens.size==1) {
-			str = " from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0" + " to " + sourceState + "_" +
+			str = " from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0;" + " to " + sourceState + "_" +
 				(n + 1) + "\n " + printSingleComm(new ArrayList, new ArrayList, sourceState, destState, n + 1)
 		} else if (inputs.size == 0 && outputs.size > 0) {
-			str = " from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0" + " to " + sourceState + "_" +
+			str = " from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0;" + " to " + sourceState + "_" +
 				(n + 1)
 				if (outputs.get(0).getTokens.size > 0) {
 			outputs.get(0).getTokens.remove(0)
@@ -454,7 +455,7 @@ component «actor.simpleName»_interaction is
 		delimitWith(fiacreVars, ",")
 	}
 
-	def private listPortNamesDual(Actor actor) {
+	def private listPortNamesDualWithTypes(Actor actor) {
 		var List<String> fiacreVars = new ArrayList()
 		for (Port p : actor.outputs) {
 			fiacreVars.add(p.name + " : " + printType(p.type))
@@ -465,15 +466,33 @@ component «actor.simpleName»_interaction is
 		delimitWith(fiacreVars, ",")
 	}
 	
+	def private listPortNamesDual(Actor actor) {
+		var List<String> fiacreVars = new ArrayList()
+		for (Port p : actor.outputs) {
+			fiacreVars.add(p.name)
+		}
+		for (Port p : actor.inputs) {
+			fiacreVars.add(p.name)
+		}
+		delimitWith(fiacreVars, ",")
+	}
+	
+	def private printDualStates(Actor actor) {
+		"states s0"
+	}
+	
 	def private printDualConsumersProducers(Actor actor) {
 		var List<String> fiacreConsumerProducer = new ArrayList()
 		for (Port p : actor.inputs) {
-			fiacreConsumerProducer.add("from s0 " + p.name + "!0 to s0")
+			fiacreConsumerProducer.add(p.name + "!0; to s0")
 		}
 		for (Port p : actor.outputs) {
-			fiacreConsumerProducer.add("from s0 " + p.name + "?x to s0")
+			fiacreConsumerProducer.add(p.name + "?x; to s0")
 		}
-		delimitWith(fiacreConsumerProducer, "\n")
+		
+		"from s0 select " +
+		delimitWith(fiacreConsumerProducer, "\n [] ") +
+		" end"
 	}
 
 	def private componentPorts(Actor actor) {
@@ -487,18 +506,20 @@ component «actor.simpleName»_interaction is
 		delimitWith(fiacreVars, ",")
 	}
 
-	def private printStates(Actor actor) {
-		var int numComms = numCommunications(actor)
-		var List<String> fiacreStates = new ArrayList()
-		for (i : 0 ..< numComms) {
-			fiacreStates.add("s" + i)
-		}
-		delimitWith(fiacreStates, ",")
-	}
+//	def private printStates(Actor actor) {
+//		var int numComms = numCommunications(actor)
+//		var List<String> fiacreStates = new ArrayList()
+//		for (i : 0 ..< numComms) {
+//			fiacreStates.add("s" + i)
+//		}
+//		delimitWith(fiacreStates, ",")
+//	}
 
-	def private numCommunications(Actor actor) {
-		var int i = 0
+	def private printStates(Actor actor) {
+		var Map<State, List<ActionTargetState>> inlinedFSM = inlineActionsIntoFSM(actor.fsm)
+		var List<String> fiacreStates = new ArrayList()
 		for (Action action : actor.actions) {
+			var int i = 0
 			var Pattern inPattern = action.inputPattern
 			for (Port p : actor.inputs) {
 				i += inPattern.getNumTokens(p)
@@ -514,7 +535,7 @@ component «actor.simpleName»_interaction is
 				i += outPattern.getNumTokens(p)
 			}
 		}
-		i
+		delimitWith(fiacreStates, ",")
 	}
 
 	def private printPrivateVars(EList<Var> vars) {
