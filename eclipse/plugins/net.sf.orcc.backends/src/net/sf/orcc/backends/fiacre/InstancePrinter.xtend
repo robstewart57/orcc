@@ -81,6 +81,8 @@ import net.sf.orcc.df.FSM
 import net.sf.orcc.df.State
 import net.sf.orcc.df.Transition
 import net.sf.orcc.ir.Procedure
+import net.sf.orcc.ir.IrFactory
+import net.sf.orcc.df.DfFactory
 
 /**
  * Generate and print instance source files for the CAL actors,
@@ -109,8 +111,8 @@ class InstancePrinter extends CommonPrinter {
 
 	def public getFileContent() {
 
-		var int numInputs = actor.getInputs().size()
-		var int numOutputs = actor.getOutputs().size()
+		//var int numInputs = actor.getInputs().size()
+		//var int numOutputs = actor.getOutputs().size()
 		packageDir = actor.package.replaceAll("\\.", "/") + "/"
 
 		'''
@@ -145,9 +147,9 @@ component «actor.simpleName»_interaction is
 		delimitWith(atomicTransitions, "\n")
 	}
 
-	def private printTransitions(Actor actor) {
+	def private printTransitions(Actor myActor) {
 		var List<String> fiacreTransitions = new ArrayList()
-		var Map<State, List<ActionTargetState>> inlinedFSM = inlineActionsIntoFSM(actor.fsm)
+		var Map<State, List<ActionTargetState>> inlinedFSM = inlineActionsIntoFSM(myActor)
 		var entries = inlinedFSM.entrySet
 		for (Entry<State,List<ActionTargetState>> entry : entries) {
 			fiacreTransitions.add(printTransitionsFromState(entry).toString)
@@ -169,14 +171,21 @@ component «actor.simpleName»_interaction is
 		var String fiacrePattern = ""
 		if (action.inputPattern.ports.size == 0 && action.outputPattern.ports.size == 0) {
 			fiacrePattern = "true"
-		} else if (action.inputPattern.ports.size == 0) {
-			fiacrePattern = action.outputPattern.ports.get(0).name + "!0"
-		} else {
+		//} else if (action.inputPattern.ports.size == 0) {
+		//	fiacrePattern = action.outputPattern.ports.get(0).name + "!0"
+		//}
+		}
+		else {
+			if (action.inputPattern.ports.size > 0) {
 			var Var inVar = action.inputPattern.getVariable(
 				action.inputPattern.ports.get(0)
 			)
 			var String firstInVar = getFirstToken(action, action.inputPattern.ports.get(0).name, inVar)
 			fiacrePattern = firstInVar
+			}
+			else {
+				fiacrePattern = "true"
+			}
 		}
 		fiacrePattern + ";"
 	}
@@ -224,16 +233,18 @@ component «actor.simpleName»_interaction is
 	
 	static class PortTokens {
 		String p
-	    List<String> tokenVars
+	    Integer numTokens
 
-		new(String p, List<String> ts) {
+		new(String p, Integer ts) {
 			this.p = p;
-			this.tokenVars = ts;
+			this.numTokens = ts;
 		}
 
 		def getPort() { p; }
 
-		def getTokens() { tokenVars; }
+		def getTokens() { numTokens; }
+		
+		def setTokens(Integer i) { numTokens = i; }
 	}
 	
 
@@ -246,40 +257,44 @@ component «actor.simpleName»_interaction is
 			var outputs = outputPatternMap(transAction)
 			topLevelStateTransitions.add(
 				printSingleComm(inputs, outputs, sourceState,
-					destState, 2)
+					transAction, destState, 2)
 				)
-			fiacreTo = "to " + sourceState.name + "_2"
+			fiacreTo = "to " + sourceState.name + "_" + transAction.name + "_2"
 		}
 
 		fiacreTo
 	}
 	
 	def private String printSingleComm(List<PortTokens> inputs, List<PortTokens> outputs, State sourceState,
-		State destState, int n) {
+		Action transAction, State destState, int n) {
 		var String str = ""
 		if (inputs.size == 0 && outputs.size == 0) {
-			str = " from " + sourceState.name + "_" + n + " to " + destState.name
-		} else if (inputs.size > 0 && inputs.get(0).getTokens.length == 1) {
-			str = " from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token;" + " to " + sourceState.name +
-				"_" + (n + 1) + "\n " + printSingleComm(inputs.subList(1,inputs.size), outputs, sourceState, destState, n + 1)
+			str = " from " + sourceState.name + "_" + transAction.name + "_" + n + " to " + destState.name
+		} else if (inputs.size > 0 && inputs.get(0).getTokens == 1) {
+			str = " from " + sourceState.name + "_" + transAction.name + "_" + n + " " + inputs.get(0).getPort + "?token;" + " to " + sourceState.name
+				+ "_" + transAction.name + "_" + (n + 1) + "\n " + printSingleComm(inputs.subList(1,inputs.size), outputs, sourceState, transAction, destState, n + 1)
 		} else if (inputs.size > 0) {
-			str = " from " + sourceState.name + "_" + n + " " + inputs.get(0).getPort + "?token;" + " to " + sourceState.name +
+			str = " from " + sourceState.name + "_" + transAction.name + "_" + n + " " + inputs.get(0).getPort + "?token;" + " to " + sourceState.name + "_" + transAction.name +
 				"_" + (n + 1)
 
-			inputs.get(0).getTokens.remove(0)
-			str += "\n " + printSingleComm(inputs, outputs, sourceState, destState, n + 1)
-		} else if (inputs.size == 0 && outputs.size == 1 && outputs.get(0).getTokens.size==1) {
-			str = " from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0;" + " to " + sourceState + "_" +
-				(n + 1) + "\n " + printSingleComm(new ArrayList, new ArrayList, sourceState, destState, n + 1)
+			// inputs.get(0).getTokens.remove(0)
+			System.out.println(inputs.get(0).getTokens-1)
+			inputs.get(0).setTokens( inputs.get(0).getTokens-1)
+			str += "\n " + printSingleComm(inputs, outputs, sourceState, transAction, destState, n + 1)
+		} else if (inputs.size == 0 && outputs.size == 1 && outputs.get(0).getTokens==1) {
+			System.out.println("CLAUSE-1")
+			str = " from " + sourceState.name + "_" + transAction.name + "_" + n + " " + outputs.get(0).getPort + "!0;" + " to " + sourceState + "_" + transAction.name + "_" +
+				(n + 1) + "\n " + printSingleComm(new ArrayList, new ArrayList, sourceState, transAction, destState, n + 1)
 		} else if (inputs.size == 0 && outputs.size > 0) {
-			str = " from " + sourceState.name + "_" + n + " " + outputs.get(0).getPort + "!0;" + " to " + sourceState + "_" +
+			System.out.println("CLAUSE-2 " + inputs.size + " " + outputs.size + " " + outputs.get(0).getTokens)
+			str = " from " + sourceState.name + "_" + transAction.name + "_" + n + " " + outputs.get(0).getPort + "!0;" + " to " + sourceState + "_" + transAction.name + "_" +
 				(n + 1)
-				if (outputs.get(0).getTokens.size > 0) {
-			outputs.get(0).getTokens.remove(0)
-			} else if (outputs.get(0).getTokens.size == 0) {
+				if (outputs.get(0).getTokens > 0) {
+			outputs.get(0).setTokens( outputs.get(0).getTokens-1)
+			} else if (outputs.get(0).getTokens == 0) {
 				outputs.remove(0)
 			}
-			str += "\n " + printSingleComm(inputs, outputs, sourceState, destState, n+1)
+			str += "\n " + printSingleComm(inputs, outputs, sourceState, transAction, destState, n+1)
 			}
 		else{
 			System.out.println("printSingleComm: non exhaustive pattern matching.")
@@ -288,6 +303,76 @@ component «actor.simpleName»_interaction is
 		str
 	}
 
+def private inputPatternMap(Action action) {
+		// var Map<String, Integer> portTokenMap = new HashMap<String, Integer>
+		var List<PortTokens> patternMap = new ArrayList<PortTokens>
+		for (Port p : action.inputPattern.ports) {
+			patternMap.add(new PortTokens(p.name,new Integer(action.inputPattern.getNumTokens(p))))
+		}
+		
+		patternMap
+		}
+		
+def private outputPatternMap(Action action) {
+		// var Map<String, Integer> portTokenMap = new HashMap<String, Integer>
+		var List<PortTokens> patternMap = new ArrayList<PortTokens>
+		for (Port p : action.outputPattern.ports) {
+			// portTokenMap.put(p.name,new Integer(action.outputPattern.getNumTokens(p)))
+			patternMap.add(new PortTokens(p.name,new Integer(action.outputPattern.getNumTokens(p))))
+		}
+		
+		patternMap
+		}		
+		
+
+/*
+	def private inputPatternMap(Action action) {
+		var Map<String, Integer> portTokenMap = new HashMap<String, Integer>
+		for (Instruction inst : allInstructionsInBody(action.body)) {
+			switch (inst) {
+				InstLoad: {
+					var instLoad = (inst as InstLoad)
+					if (portTokenMap.containsKey(inst.source.variable.name)) {
+						// portTokenMap.get(instLoad.source.variable.name).add(instLoad.target.variable.name)
+						
+						var Integer i = portTokenMap.get(inst.source.variable.name)
+						var Integer index = (instLoad.indexes.get(0) as ExprInt).intValue
+						if (index > i) {
+							portTokenMap.put(inst.source.variable.name,index + 1)
+						}
+						
+					} else {
+						//portTokenMap.put(inst.source.variable.name, new ArrayList)
+						//portTokenMap.get(inst.source.variable.name).add(instLoad.target.variable.name)
+						
+						System.out.println(action.name)
+						System.out.println(instLoad.indexes.length)
+						if (instLoad.indexes.get(0) === null) {
+							
+						} else {
+						System.out.println(instLoad.indexes.get(0) + "\n")
+						var Integer index = (instLoad.indexes.get(0) as ExprInt).intValue
+						portTokenMap.put(inst.source.variable.name,index + 1)
+						}
+						
+					}
+				}
+				default: {
+				}
+			}
+		}
+		
+		var List<PortTokens> patternMap = new ArrayList<PortTokens>
+		for (Entry<String,Integer> entry : portTokenMap.entrySet) {
+			patternMap.add(new PortTokens(entry.key, entry.value))
+		}
+		
+		patternMap
+	}
+	* 
+	*/
+
+/*
 	def private inputPatternMap(Action action) {
 		var Map<String, List<String>> portTokenMap = new HashMap<String, List<String>>
 		for (Instruction inst : allInstructionsInBody(action.body)) {
@@ -313,13 +398,54 @@ component «actor.simpleName»_interaction is
 		
 		patternMap
 	}
+*/
 
-	def private outputPatternMap(Action action) {
+/*
+def private outputPatternMap(Action action) {
+		var Map<String, Integer> portTokenMap = new HashMap<String, Integer>
+		for (Instruction inst : allInstructionsInBody(action.body)) {
+			switch (inst) {
+				InstStore: {
+					var instStore = (inst as InstStore)
+					// System.out.println("STORE INDEX: " + instStore.indexes.get(0))
+					if (portTokenMap.containsKey(instStore.target.variable.name)) {
+						var Integer i = portTokenMap.get(instStore.target.variable.name)
+						var Integer index = (instStore.indexes.get(0) as ExprInt).intValue
+						if (index > i) {
+							portTokenMap.put(instStore.target.variable.name,index + 1)
+						}
+						// portTokenMap.get(instStore.target.variable.name).add(printExpression(instStore.value).toString)
+					} else {
+						var Integer index = (instStore.indexes.get(0) as ExprInt).intValue
+						portTokenMap.put(instStore.target.variable.name,index + 1)
+						//portTokenMap.put(instStore.target.variable.name, new ArrayList)
+						//portTokenMap.get(instStore.target.variable.name).add(printExpression(instStore.value).toString)
+					}
+				}
+				default: {
+				}
+			}
+		}
+//	
+//		
+		var List<PortTokens> patternMap = new ArrayList<PortTokens>
+		for (Entry<String,Integer> entry : portTokenMap.entrySet) {
+			patternMap.add(new PortTokens(entry.key, entry.value))
+		}
+		
+		
+		patternMap
+	}
+*/
+
+/*
+ 	def private outputPatternMap(Action action) {
 		var Map<String, List<String>> portTokenMap = new HashMap<String, List<String>>
 		for (Instruction inst : allInstructionsInBody(action.body)) {
 			switch (inst) {
 				InstStore: {
 					var instStore = (inst as InstStore)
+					System.out.println("STORE: " + instStore)
 					if (portTokenMap.containsKey(instStore.target.variable.name)) {
 						portTokenMap.get(instStore.target.variable.name).add(printExpression(instStore.value).toString)
 					} else {
@@ -341,6 +467,7 @@ component «actor.simpleName»_interaction is
 		
 		patternMap
 	}
+	*/
 
 	def private printStatements(List<Instruction> statements) {
 		var List<String> fiacreStatements = new ArrayList()
@@ -424,9 +551,16 @@ component «actor.simpleName»_interaction is
 		def getTargetState() { targetState; }
 	}
 
-	def private inlineActionsIntoFSM(FSM fsm) {
+	def private inlineActionsIntoFSM(Actor actor) {
+		var FSM fsmOrig = actor.fsm
 		var Map<State, List<ActionTargetState>> inlinedFSM = new HashMap()
-		if (fsm != null) {
+		
+		var FSM fsm = fsmOrig
+		if (fsm === null) {
+			fsm = makeFSM(actor)
+		}
+		
+		// if (fsm != null) {
 			var i = 0
 			for (Transition t : fsm.transitions) {
 				if (inlinedFSM.containsKey(t.source)) {
@@ -440,9 +574,19 @@ component «actor.simpleName»_interaction is
 				}
 				i++
 			}
-		}
+		// }
 		inlinedFSM
 	}
+
+    def private makeFSM(Actor actor) {
+    	var FSM fsm = DfFactory.eINSTANCE.createFSM
+    	DfFactory.eINSTANCE.createState()
+    	for (Action action : actor.actions) {
+    		var State s0 = DfFactory.eINSTANCE.createState("s0")
+    		fsm.addTransition(s0,action,s0)
+    	}
+    	fsm
+    }
 
 	def private listPortNames(Actor actor) {
 		var List<String> fiacreVars = new ArrayList()
@@ -516,23 +660,48 @@ component «actor.simpleName»_interaction is
 //	}
 
 	def private printStates(Actor actor) {
-		var Map<State, List<ActionTargetState>> inlinedFSM = inlineActionsIntoFSM(actor.fsm)
+		var Map<State, List<ActionTargetState>> inlinedFSM = inlineActionsIntoFSM(actor)
 		var List<String> fiacreStates = new ArrayList()
-		for (Action action : actor.actions) {
-			var int i = 0
-			var Pattern inPattern = action.inputPattern
-			for (Port p : actor.inputs) {
-				i += inPattern.getNumTokens(p)
-			}
-			for (Port p : actor.outputs) {
-				i += inPattern.getNumTokens(p)
-			}
-			var Pattern outPattern = action.outputPattern
-			for (Port p : actor.inputs) {
-				i += outPattern.getNumTokens(p)
-			}
-			for (Port p : actor.outputs) {
-				i += outPattern.getNumTokens(p)
+		for (Entry<State, List<ActionTargetState>> entry : inlinedFSM.entrySet) {
+			// var int i = 0
+			fiacreStates.add(entry.key.name)
+			for (ActionTargetState transition : entry.value) {
+				var int k = 2
+				var Action action = transition.getTransitionAction
+				var Pattern inPattern = action.inputPattern
+				for (Port p : actor.inputs) {
+					var int z = inPattern.getNumTokens(p)
+					for (var int j = 0; j < z; j++){
+						fiacreStates.add(entry.key.name + "_" + action.name + "_" + k)
+						k++
+					}
+				}
+				for (Port p : actor.outputs) {
+					//i += inPattern.getNumTokens(p)
+					var int z = inPattern.getNumTokens(p)
+					for (var int j = 0; j < z; j++){
+						fiacreStates.add(entry.key.name + "_" + action.name + "_" + k)
+						k++
+					}
+				}
+				var Pattern outPattern = action.outputPattern
+				for (Port p : actor.inputs) {
+					//i += outPattern.getNumTokens(p)
+					var int z = outPattern.getNumTokens(p)
+					for (var int j = 0; j < z; j++){
+						fiacreStates.add(entry.key.name + "_" + action.name + "_" + k)
+						k++
+					}
+				}
+				for (Port p : actor.outputs) {
+					//i += outPattern.getNumTokens(p)
+					var int z = outPattern.getNumTokens(p)
+					for (var int j = 0; j < z; j++){
+						fiacreStates.add(entry.key.name + "_" + action.name + "_" + k)
+						k++
+					}
+				}
+				fiacreStates.add(entry.key.name + "_" + action.name + "_" + k)
 			}
 		}
 		delimitWith(fiacreStates, ",")
