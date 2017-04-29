@@ -141,7 +141,7 @@ public class OrccProcess extends PlatformObject implements IProcess {
 	ILaunch launch;
 	IStreamsProxy streamProxy;
 
-	OrccProcess(Job job, ILaunch launch) {
+	public OrccProcess(Job job, ILaunch launch) {
 		terminated = false;
 
 		this.job = job;
