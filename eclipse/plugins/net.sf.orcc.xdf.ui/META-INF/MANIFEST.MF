@@ -23,6 +23,7 @@ Require-Bundle: net.sf.orcc.ui,
  org.eclipse.emf.common
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Bundle-ActivationPolicy: lazy
-Import-Package: net.sf.orcc.ui
+Import-Package: net.sf.orcc.backends.cal,
+ net.sf.orcc.ui
 Bundle-ClassPath: lib/klay_0.11.0.jar,
  .
