@@ -98,7 +98,6 @@ import net.sf.orcc.util.OrccLogger;
 import net.sf.orcc.util.OrccUtil;
 import net.sf.orcc.util.Void;
 import net.sf.orcc.util.util.EcoreHelper;
-import net.sf.orcc.df.util.TransformPreconditionPredicates;
 
 /*
 * @author Rob Stewart
@@ -169,19 +168,17 @@ public class DataCollection extends DfVisitor<Void> {
 		 
 
 //		System.out.println("Guard analysis");
-<<<<<<< HEAD
+
 //		guards(dir + "guards.txt", workspaceXdfNetworks);
-<<<<<<< HEAD
+
 		
 		System.out.println("Acyclic non-branching consumption");
 		consumptionAcyclicNoBranching(dir + "acyclic-non-branching.txt", workspaceXdfNetworks);
-=======
->>>>>>> 9ba0ba9e9... Data collection fixes prior to ICGT 2017 submission
-=======
+
 //		guards(dir + "guards.txt", workspaceXdfNetworks);	
 		//System.out.println("Acyclic non-branching consumption");
 		//consumptionAcyclicNoBranching(dir + "acyclic-non-branching.txt", workspaceXdfNetworks);
->>>>>>> 36a4be48b... Merge data collection commits
+
 
 		return null;
 	}
